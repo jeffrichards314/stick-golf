@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b2a4a">
+<title>Stick Golf</title>
+<link rel="stylesheet" href="game/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+  <div id="hud" class="hidden"></div>
+  <div id="ui"></div>
+  <div id="toasts"></div>
+  <div id="boot-msg">Loading…</div>
+</div>
+<script>
+  // Script loader: missing files are non-fatal (onerror just records them).
+  window.GOLF = window.GOLF || {};
+  GOLF._missing = [];
+  GOLF._errors = [];
+  window.addEventListener('error', function (e) { GOLF._errors.push(String(e.message || e)); });
+</script>
+<script src="src/rng.js" onerror="GOLF._missing.push('src/rng.js')"></script>
+<script src="src/physics.js" onerror="GOLF._missing.push('src/physics.js')"></script>
+<script src="src/manifest.js" onerror="GOLF._missing.push('src/manifest.js')"></script>
+<script src="src/designs/registry.js" onerror="GOLF._missing.push('src/designs/registry.js')"></script>
+<script src="src/designs/core.js" onerror="GOLF._missing.push('src/designs/core.js')"></script>
+<script src="src/designs/a.js" onerror="GOLF._missing.push('src/designs/a.js')"></script>
+<script src="src/designs/b.js" onerror="GOLF._missing.push('src/designs/b.js')"></script>
+<script src="src/designs/c.js" onerror="GOLF._missing.push('src/designs/c.js')"></script>
+<script src="src/templates.js" onerror="GOLF._missing.push('src/templates.js')"></script>
+<script src="src/generator.js" onerror="GOLF._missing.push('src/generator.js')"></script>
+<script src="src/bot.js" onerror="GOLF._missing.push('src/bot.js')"></script>
+<script src="data/index.js" onerror="GOLF._missing.push('data/index.js')"></script>
+<script src="game/render.js" onerror="GOLF._missing.push('game/render.js')"></script>
+<script src="game/storage.js"></script>
+<script src="game/modes.js"></script>
+<script src="game/audio.js"></script>
+<script src="game/input.js"></script>
+<script src="game/camera.js"></script>
+<script src="game/progression.js"></script>
+<script src="game/dev.js"></script>
+<script src="game/play.js"></script>
+<script src="game/run.js"></script>
+<script src="game/ui.js"></script>
+<script src="game/main.js"></script>
+</body>
+</html>
