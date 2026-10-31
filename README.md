@@ -9,6 +9,10 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
 * **Modes:** Endless (fully customisable), Daily Challenge and Random Course, with shareable seed codes.
 * **Bot-verified.** A headless bot running the *same* physics module finishes every baked hole in at most par+2 strokes. Its solution must actually use the course's gimmick.
 
+## Play online
+
+**https://jeffrichards314.github.io/stick-golf/** (hosted with GitHub Pages from the `main` branch; every push redeploys it).
+
 ## Run
 
 Open `index.html` in a browser by double-clicking it. Nothing needs installing and there is no build step, because the baked hole data is committed in `data/`.
