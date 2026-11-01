@@ -6,7 +6,7 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
 * **The 60 courses come one after another, each its own concept.** Course 1 is plain golf. Every course after it introduces **one new gimmick**, for **59 gimmicks** in all. Its holes are built around that gimmick, which is usually the only way to the cup: walls no swing can clear, chasms wider than a full-power shot, sealed vaults, tunnels through mountains. Later holes in each course mix in gimmicks from earlier courses.
 * **Spin on full shots, never on putts.** Backspin lifts the ball and makes it bite; topspin dives and runs on.
 * **Swish bonus.** Drop the ball straight into the cup without touching the green first and you get −1 stroke.
-* **Modes:** Endless (fully customisable), Daily Challenge and Random Course, with shareable seed codes, plus local pass-and-play **Multiplayer** for 2–4 players.
+* **Modes:** Endless (fully customisable), Daily Challenge and Random Course, with shareable seed codes, local pass-and-play **Multiplayer** for 2–4 players, and a **Hole Editor** for building, verifying and sharing your own holes.
 * **Bot-verified.** A headless bot running the *same* physics module finishes every baked hole in at most par+2 strokes. Its solution must actually use the course's gimmick.
 
 ## Play online
@@ -26,6 +26,11 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
   * **Scorecard:** one shared card with a row per player (hole scores, Out / In / Tot and vs par). It appears after every hole, from the pause menu and from the hand-off screen. The pause menu offers resume, scorecard, mulligan, settings and quit (with a confirm).
   * **Results:** standings with rank ties, a winner celebration, each player's swishes, aces, picked-up holes, mulligans and time, then Play again, New setup or Menu.
   * **Not recorded:** multiplayer games never unlock courses, set personal bests or daily results, or count toward lifetime stats and achievements. They also don't mark gimmicks as met.
+* **Hole Editor:** build your own hole in the browser, prove it can be beaten, and share it as a link or code. See [How to make a hole](#how-to-make-a-hole).
+  * **Canvas editor** drawn with the game's own renderer: pan and zoom with mouse or touch, grid snap, undo/redo, duplicate, delete and keyboard shortcuts. Phone layout with a bottom toolbar and bigger handles.
+  * **Everything editable:** ground points and per-segment surfaces, solid polygons (per-edge or whole-solid surfaces), tee and cup (with an automatic flat tee box and green), all 59 gimmicks with every field from the contract, and the hole's name, theme, width and par.
+  * **Test play** with unlimited strokes, then back to editing. **Prove it's beatable** runs the bot; only verified holes carry the "verified" badge.
+  * **Share codes:** a compressed code or a `…/#hole=<code>` link. Opening a link plays the hole straight away, with an "Edit a copy" button. **My Holes** keeps your holes on this device (rename, duplicate, delete, export code).
 * **Daily Challenge:** a seeded 9-hole course each day. Results go on a local leaderboard with streaks, and an emoji share card can be copied or shared.
 * **Endless:** fully customisable. Gimmicks unlock as you complete their tutorials.
 * **Previous shot:** while you aim, a ghost ball replays your last shot, and the last aim and power are marked.
@@ -54,6 +59,7 @@ Useful URL parameters:
 * `?unlock=all` unlocks every course and cosmetic.
 * `?course=t3c04&hole=2` jumps straight into a hole.
 * `?dev=1` loads a test hole.
+* `#hole=<code>` (from a share link) plays a shared hole straight away.
 
 ## Controls
 
@@ -95,7 +101,8 @@ The first time you meet a gimmick, a card explains it.
 ```bash
 node tools/verify.js     # full verification suite (cached: re-runs take well under a second)
 node tools/build.js      # regenerate + bot-verify + bake every course (≈50 s on 10 cores; cached per course)
-npm test                 # manifest test + verify
+node test/holecode.test.js   # hole-editor share codes: codec, sanitiser, round trips, hostile input
+npm test                 # manifest test + share-code test + verify
 ```
 
 `tools/verify.js` runs five checks and prints a pass/fail table of all 1,080 holes. Each cell shows bot strokes / par.
@@ -129,7 +136,12 @@ src/generator.js    hole composition, course plans, validation, Endless/Daily/Ra
 src/bot.js          shot-search bot (beam search + geodesic field with teleport/pipe/cannon shortcuts, switch & token goals)
 data/               baked holes (one JS file per course) + index
 game/               renderer, UI, input, camera, audio, storage, progression, modes, multiplayer (multi.js)
-tools/ test/        build, verify, try, worker pool
+game/holeschema.js  hole editor schema: the 59 gimmicks' defaults, fields, canvas handles, surfaces + the hole sanitiser
+game/holecode.js    share codes (JSON → deflate-raw / built-in LZ → base64url), decoder guards, bot-solution check
+game/editor.js      editor core: document, geometry, selection + handles, canvas rendering, input, undo, validation, verify
+game/editor-ui.js   editor DOM: tool rail, tool + property panels, dialogs
+game/myholes.js     My Holes storage, editor hub, templates, import / share screens, shared-hole play, #hole= links
+tools/ test/        build, verify, try, worker pool, manifest + share-code tests
 docs/CONTRACT.md    hole JSON format, gimmick field reference, module APIs
 ```
 
@@ -196,6 +208,33 @@ Each hole is bot-verified and re-seeded until it passes. From attempt 7 on, diff
   * enclosures: `corridor` (a tunnel through an un-clearable mountain), `vault` (a sealed green);
   * floating ground: `island`, `islandGreen`;
   * greens and launches: `greenFlat`, `ballistic`, `tune`.
+
+## How to make a hole
+
+Open **Editor** on the title menu, then **New hole**: start from a blank flat hole, or copy any of the 1,080 course holes or the 59 tutorial holes. Your work saves to **My Holes** (this device only) as you go.
+
+**Build.** The rail on the left switches tools (keys in brackets):
+
+| Tool | What it does |
+|---|---|
+| Select (V) | Tap anything to select it, drag to move it, drag empty space to pan, scroll or pinch to zoom. Handles on the selection resize it, rotate angles, stretch ranges and move points. |
+| Ground (L) | The ground is a polyline whose x runs left to right. Tap the line to add a point and drag it; select a point to delete it. Each segment has its own surface (fairway, green, rough, sand, ice, goo, bouncy, rock, ricochet, metal, quicksand, cushion, skim water, and the water / lava / out-of-bounds / spikes / laser / void hazards). "Paint surface" paints segments quickly. |
+| Solids (P) | Closed polygons for walls, ledges, caves and islands. Draw a polygon corner by corner (tap the green first corner to close), or drop a block, ramp or island. Drag corners, tap a "+" to add one, delete one, and set a surface per edge or for the whole solid. |
+| Tee & cup (C) | Tap or drag to place them; they drop onto the surface below. With **Auto-level the ground** on (default) the editor flattens a tee box and a green under them. |
+| Gimmicks (A) | All 59 gimmicks, grouped like Endless packs. Pick one and tap the canvas to place it, then edit it: sliders for numbers, a dial for angles, handles for rectangles, segments, radii, directions and point lists (pipe path, stars, decoy cups, cup spots, toggle blocks and phase blocks). |
+| Hole (H) | Name, theme (any course's palette), width, par (automatic or manual) and the list of problems. |
+
+The **time bar** at the bottom plays and scrubs the motion of every moving gimmick; "Stroke" previews stroke-dependent gimmicks (phase blocks, rising water). Hold **Alt** while dragging for free placement, **Space** + drag pans, **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+D** duplicates, **Delete** removes, arrow keys nudge, **G** toggles the grid, **F** fits the whole hole.
+
+**Problems** are listed on the Hole tab and flagged on the canvas (tee or cup inside terrain or a gimmick, cup not on a surface, ground out of order, solids that cross themselves, duplicate cup-controlling gimmicks…). Each has a quick fix where one exists.
+
+**Test play** (Ctrl+Enter) plays the hole with unlimited strokes and restarts; quitting returns to the editor.
+
+**Prove it's beatable** runs `GOLF.Bot.createSolver(hole, {maxStrokes: par + 2})` a few milliseconds per frame, with a progress dialog. On success the solution is stored in `hole.bot` and, with automatic par on, the par is set with `Generator.finalizePar`. "Show me" replays the solution as a ghost ball. Any edit to the course clears the verification (renaming, theme and par do not). A hole the bot cannot solve stays **unverified**: it can still be shared, but its code carries no badge.
+
+**Share.** The Share button (and My Holes → share) shows a link and a code. The link is `https://jeffrichards314.github.io/stick-golf/#hole=<code>`. The code is the hole as compact JSON, compressed with `CompressionStream('deflate-raw')` when the browser has it (otherwise a small built-in LZ), then base64url. Verified holes include the bot's solution; the receiving game replays it on its own physics before showing the **Verified** badge, so a code can never fake it. Codes are size-limited and every value is sanitised on import, so a malformed or hostile code is rejected or cleaned, never trusted. Use **Editor → Play a shared hole** to paste a code or link, or just open the link: it loads the hole directly into play, with **Edit a copy** on the HUD, the pause menu and the result screen.
+
+`node test/holecode.test.js` covers the codec: the built-in LZ and inflate against zlib, the sanitiser on all 1,140 baked and tutorial holes, encode → decode round trips that stay verified, and malformed, fuzzed and zip-bomb codes. Field ranges for every gimmick live in `game/holeschema.js` (`SPEC`); a new gimmick needs an entry there as well as in the physics and renderer.
 
 ## How to tune Endless presets
 

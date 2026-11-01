@@ -221,3 +221,50 @@ GOLF.App.startMultiplayer({
   last player), `mpScorecard`, `mpResults`.
 * `GOLF.App.status().multi = { phase, turn, turnName, turnBall, count, setup, players:[{name, ball, scores, failed, total, vsPar, mulligans, swishes, aces, pickups, time}] }`.
 * `GOLF.Multi.standings(run)` ranks players by score vs par (equal scores share a rank).
+
+## v5: hole editor + share codes
+
+Files: `game/holeschema.js` (`GOLF.HoleSchema`), `game/holecode.js` (`GOLF.HoleCode`), `game/editor.js` + `game/editor-ui.js` (`GOLF.Editor`),
+`game/myholes.js` (`GOLF.MyHoles`). The two schema/codec files are UMD, so Node tests can `require` them. Physics, bot and generator are unchanged.
+
+### Editor hole
+A normal hole (see "Hole JSON") with `id:'custom'`, `v:2`, no `tpl/role/sig`, plus editor-only fields:
+`auto` (par is automatic), and `bot: { s, shots:[[angle, power], ...] }` only while the hole is verified. `w` is always the last ground x;
+`h` is derived (`max(1000, lowest ground/solid y + 380)`). Editing the course (anything in `HoleSchema.geoKey`) removes `bot`.
+
+### `GOLF.HoleSchema`
+```js
+SPEC[type] = { t, make(x,y), parts:[...canvas handles], fields:[...params], keys, lists, posX, posY, cup?, zone? }
+  fields: {k, label, t:'n'|'ang'|'ph'|'bool', min, max, step, int?}      // min/max are enforced by the sanitiser
+  parts:  rect | seg | pt(kx,ky,r?) | len(from,k,dir,scale) | ang(from,k) | vec(from,kx,ky,scale) | xrange | hline | pts | poly | rects
+LIM                 // ground/solid/gimmick/list counts, world size, name length, ...
+SURFS               // [{c, name, col, g:'Ground'|'Special'|'Hazard'}]
+sanitizeHole(raw, {themes}) -> { hole, warn:[] }   // throws Error(message) when there is no usable ground
+sanitizeGm(raw) -> gimmick | null                  // unknown types dropped, missing fields defaulted, numbers clamped to the field ranges
+makeGimmick(type,x,y), blankHole(w), geoKey(hole), estimatePar(hole)
+```
+Every baked and tutorial gimmick passes `sanitizeGm` unchanged (checked by `test/holecode.test.js`).
+
+### `GOLF.HoleCode`
+```js
+code = <fmt><base64url>        // fmt 'd' = deflate-raw, 'z' = built-in LZ (varint length + LZSS, 32 KB window)
+payload (JSON, v:1) = { v, n:name, th:theme, s:seed, p:par, h, t:[tee], c:[cup], cw?:cupW, a?:1 (auto par), g:ground (delta-coded),
+                        gs, o?:[{p:(delta-coded), s}], m?:[gimmicks], b?:[a0,p0,a1,p1,...] (bot solution, verified holes only) }
+encode(hole, {bot?:bool, noNative?}) -> Promise<code>     encodeSync(hole) -> code (LZ only)
+decode(code, {noNative?}) -> Promise<{hole, warn, verified, strokes}>   // rejects with a short friendly Error
+parseInput(text) -> code | null        // bare code, share URL, or text containing one
+url(code) -> 'https://jeffrichards314.github.io/stick-golf/#hole=' + code
+canon(hole) -> sanitised, rounded copy (bot kept only if the geometry is unchanged)      check(hole) -> {verified, strokes}
+```
+Limits: code <= 60,000 chars, decompressed <= 600,000 bytes (enforced while inflating), ground <= 600 points, solids <= 60, gimmicks <= 150.
+`verified` is **recomputed on decode** by replaying `bot.shots` with `Bot.replay` (must hole out in <= par + 2 strokes); the flag in a code is never trusted.
+
+### Runs and screens
+* `GOLF.App.startCustom(hole, {mode:'test'|'shared', verified, local, warn, ret, retArgs})` starts a run of kind `'custom'`
+  (`run.custom = {mode, verified, local, ret, retArgs}`): unlimited strokes, restart and "Show me" (when `hole.bot`), nothing recorded
+  (no progress, stats, achievements or "gimmicks met"). `mode:'test'` returns to the editor on quit; `'shared'` shows `editorHub`.
+* Screens: `editorHub`, `newHole`, `tplCourses`, `tplHoles`, `tplTutorials`, `myHoles`, `shareHole`, `importHole`, `customDone`.
+* `GOLF.MyHoles`: `list/get/count/save(entry, hole)/remove/rename/duplicate/edit(id)/editCopy(hole,name)/editNew()/openCode(text)/checkHash()`;
+  storage key `sgolf.myholes` (`{v:1, items:[{id,name,par,verified,gm,created,updated,hole}]}`, max 60).
+* `GOLF.Editor.open(entry, hole)`, `.close()`, `.frame(time, dt)` (called by the main loop while active), `.step(n, dt)` (manual stepping for automation),
+  `.verify()`, `.testPlay()`, `.select(sel)`, `.addGimmick(type,x,y)`, `.S` (editor state).

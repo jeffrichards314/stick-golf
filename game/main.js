@@ -77,14 +77,15 @@
       kicker = 'Hole ' + ((r.offset || 0) + r.idx + 1); mode = 'Multiplayer · ' + rn + ' · ' + (r.idx + 1) + '/' + r.n;
     } else if (r.kind === 'practice') { kicker = 'Hole ' + ((r.offset || 0) + 1); mode = 'Practice' + (r.def && r.def.name ? ' · ' + r.def.name : ''); }
     else if (r.kind === 'tutorial') { kicker = 'Tutorial'; mode = 'Unlimited strokes · restart any time'; }
+    else if (r.kind === 'custom') { kicker = r.custom.mode === 'test' ? 'Test play' : 'Shared hole'; mode = 'Unlimited strokes · restart any time'; }
     else { sub = 'Hole ' + (r.idx + 1) + '/' + r.n + ' ·'; kicker = 'Hole ' + (r.idx + 1) + '/' + r.n; mode = 'Practice'; }
     if ((r.kind === 'course' || r.kind === 'multi') && r.remix) mode = 'Remix · ' + mode;
-    if (!total && r.kind !== 'practice' && r.kind !== 'tutorial') { const t = rel(); if (t !== null) total = { label: 'Total', value: t }; }
+    if (!total && r.kind !== 'practice' && r.kind !== 'tutorial' && r.kind !== 'custom') { const t = rel(); if (t !== null) total = { label: 'Total', value: t }; }
     const s = App.session;
-    const timed = r.kind === 'course' || r.kind === 'multi' || r.kind === 'daily' || r.kind === 'random' || r.kind === 'practice' || r.kind === 'tutorial';
+    const timed = r.kind === 'course' || r.kind === 'multi' || r.kind === 'daily' || r.kind === 'random' || r.kind === 'practice' || r.kind === 'tutorial' || r.kind === 'custom';
     const roundT = (r.times || []).reduce((a, x) => a + (x || 0), 0) + (s && !r.scores[r.idx] ? s.clock : 0);
-    return { sub, kicker, mode, total, allowRestart: r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial',
-      clock: timed && s ? { hole: s.clock, round: r.n > 1 ? roundT : null } : null, showMe: (r.kind === 'practice' || r.kind === 'tutorial') && s && s.hasBotHint() };
+    return { sub, kicker, mode, total, allowRestart: r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial' || r.kind === 'custom',
+      clock: timed && s ? { hole: s.clock, round: r.n > 1 ? roundT : null } : null, showMe: (r.kind === 'practice' || r.kind === 'tutorial' || r.kind === 'custom') && s && s.hasBotHint(), editCopy: r.kind === 'custom' && r.custom.mode === 'shared' };
   }
   // ---------- lifetime stats + cosmetic unlocks ----------
   function checkUnlocks(r) {
@@ -98,11 +99,11 @@
     return items;
   }
   function holeStats(r, res) {
-    if (!r || r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial') return;
+    if (!r || r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial' || r.kind === 'custom') return;
     try { G.Progress.recordHoleStats(res, r.kind); } catch (e) { console.warn('[stats]', e); }
   }
   function strokeLimitFor(run, par) {
-    if (run.kind === 'practice' || run.kind === 'tutorial') return Infinity;
+    if (run.kind === 'practice' || run.kind === 'tutorial' || run.kind === 'custom') return Infinity;
     if (run.kind === 'endless') {
       const rule = run.settings.strokeRule || 'par+2';
       if (rule === 'unlimited') return Infinity;
@@ -151,6 +152,13 @@
   // "New gimmick" intro cards during the pre-shot pan + token hint
   function introduce(r, i, hole) {
     try {
+      if (r.kind === 'custom') { // hand-made holes: explain the gimmicks, but never touch the "gimmicks met" record
+        if (r.custom.mode !== 'shared') return;
+        const info0 = (G.Manifest && G.Manifest.GIMMICK_INFO) || {}, ts = [];
+        (hole.gm || []).forEach((g) => { if (g && g.t && ts.indexOf(g.t) < 0 && info0[g.t]) ts.push(g.t); });
+        ts.slice(0, 2).forEach((t, k) => setTimeout(() => { if (App.session && App.session.hole === hole) G.UI.introCard(t, info0[t]); }, 350 + k * 2600));
+        return;
+      }
       const mpr = r.kind === 'multi';
       if (mpr && r.mp.turn > 0) return; // pass-and-play: the cards show once per hole, for the first player
       const M = G.Manifest, info = (M && M.GIMMICK_INFO) || {};
@@ -175,6 +183,7 @@
     if (r.kind === 'multi') { G.Multi.holed(res); return; }
     let newBest = false;
     const score = res.score !== undefined ? res.score : res.strokes;
+    if (r.kind === 'custom') { G.UI.showHud(false); G.UI.show('customDone', { res, score, name: App.session.hole.name, time: res.time }); return; }
     if (r.kind === 'practice' || r.kind === 'tutorial') {
       G.UI.showHud(false);
       let first = false;
@@ -202,7 +211,7 @@
   function onFailed(res) {
     const r = App.run;
     if (r.kind === 'multi') { G.Multi.failed(res, App.session); return; }
-    if (r.kind === 'practice' || r.kind === 'tutorial') { // e.g. swamped by the flood: just start the hole again
+    if (r.kind === 'practice' || r.kind === 'tutorial' || r.kind === 'custom') { // e.g. swamped by the flood: just start the hole again
       setTimeout(() => { if (App.session && App.run === r) { App.session.restart(); G.UI.toast('Try again!', 'info', 1200); } }, 300);
       return;
     }
@@ -385,6 +394,22 @@
     playCurrent();
     return true;
   };
+  // Custom holes (editor test play / shared codes / My Holes): opts = { mode:'test'|'shared', verified, local, warn, ret, retArgs }
+  App.startCustom = function (hole, opts) {
+    opts = opts || {};
+    const r = G.Run.fromHoles('custom', null, [hole], G.Modes.current());
+    r.custom = { mode: opts.mode === 'test' ? 'test' : 'shared', verified: !!opts.verified, local: !!opts.local, ret: opts.ret || null, retArgs: opts.retArgs || null };
+    r.mulligans = { left: Infinity };
+    G.UI.hide();
+    App.run = r; App.session = null;
+    if (G.Editor && G.Editor.active && r.custom.mode !== 'test') { G.Editor.commit(); G.Editor.save(); G.Editor.active = false; document.getElementById('editor').classList.add('hidden'); }
+    playCurrent();
+    if (opts.warn && opts.warn.length) G.UI.toast('Note: ' + opts.warn.join('; '), 'info', 3200);
+    return true;
+  };
+  // back to a menu screen (used when leaving the editor)
+  App.restoreMenu = function (screen) { App.session = null; App.run = null; App.waiting = false; G.UI.setCoach(null); G.UI.showHud(false); App.cancelAttract(); startAttract(); G.UI.show(screen || 'title'); };
+  App.cancelAttract = function () { attractTry++; App.attract = null; };
   // Local pass-and-play: App.startMultiplayer({players:[{name, ball}], courseId, round, remix, seed}) -> started?
   // courseId => a baked course (round 'all'|'front'|'back', remix); no courseId => a Random course (seed number or code, default random).
   App.startMultiplayer = function (o) { return G.Multi ? G.Multi.start(o) : false; };
@@ -443,7 +468,7 @@
   };
   App.restartHole = function () {
     const k = App.run && App.run.kind;
-    if (!App.session || !(k === 'dev' || k === 'practice' || k === 'tutorial')) return; // rounds play straight through
+    if (!App.session || !(k === 'dev' || k === 'practice' || k === 'tutorial' || k === 'custom')) return; // rounds play straight through
     App.session.restart(); App.session.paused = false; G.Audio.sfx('uiback');
     if (G.UI.current) { G.UI.hide(); G.UI.showHud(true); }
   };
@@ -456,6 +481,7 @@
     else if (r.kind === 'daily') App.startDaily();
     else if (r.kind === 'random') App.startRandom(r.seed);
     else if (r.kind === 'dev') App.startDev();
+    else if (r.kind === 'custom') App.startCustom(JSON.parse(JSON.stringify(r.holes[0])), r.custom);
     else if (r.kind === 'multi') G.Multi.start(r.mp.setup);
   };
   App.pause = function () {
@@ -480,7 +506,9 @@
     App.session = null; App.waiting = false; App.run = null;
     if (App.lookToggle) { App.lookToggle = false; App.input.lookToggle = false; }
     G.UI.showHud(false);
+    if (r && r.kind === 'custom' && r.custom.mode === 'test' && G.Editor && G.Editor.S.hole && !screen) { G.Editor.resume(); return; }
     startAttract();
+    if (r && r.kind === 'custom' && !screen) { const c = r.custom; G.UI.show(c.ret || 'editorHub', c.retArgs); return; }
     if (screen === 'course' && r && r.courseId) G.UI.show('course', { id: r.courseId, remix: !!r.remix });
     else if (screen) G.UI.show(screen, sargs);
     else if (r && r.kind === 'practice') G.UI.show('practiceCourse', { id: r.courseId });
@@ -591,6 +619,7 @@
           else G.UI.loaderUpdate(r.jobStatus(r.idx), 'hole ' + (r.idx + 1));
         }
       }
+      if (G.Editor && G.Editor.active && !G.Editor.suspended && !App.session) { G.Editor.frame(App.time, dt); return; }
       const s = App.session || App.attract;
       if (s) {
         if (s === App.attract) attractUpdate(s, dt);
@@ -637,6 +666,7 @@
       else if (migrated) G.UI.show('notice', { kind: 'reorder' });
       else G.UI.show('title');
     }
+    if (G.MyHoles && !qs.get('dev') && !qs.get('course')) G.MyHoles.checkHash(); // #hole=<code> share links play straight away
     requestAnimationFrame(frame);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

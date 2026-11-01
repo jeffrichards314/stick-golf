@@ -6,6 +6,6 @@
   "scripts": {
     "build": "node tools/build.js",
     "verify": "node tools/verify.js",
-    "test": "node test/manifest.test.js && node tools/verify.js"
+    "test": "node test/manifest.test.js && node test/holecode.test.js && node tools/verify.js"
   }
 }

@@ -62,6 +62,24 @@
     bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
     users: '<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20.5v-1.2A5.3 5.3 0 0 1 7.8 14h2.4a5.3 5.3 0 0 1 5.3 5.3v1.2"/><path d="M16 4.8a3.4 3.4 0 0 1 0 6.4M18.3 14.3a5.3 5.3 0 0 1 3.2 5v1.2"/>',
     fire: '<path d="M12 21c-4 0-6.5-2.6-6.5-6.2 0-3.7 3-5.6 4-9.3 2.1 1.4 3 3.3 3 5.1 1-.6 1.6-1.6 1.8-3 2 1.7 4.2 4.2 4.2 7.2 0 3.6-2.5 6.2-6.5 6.2z"/>',
+    // hole editor
+    redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+    cursor: '<path d="M5.5 3.5 19 10.5l-6 2L10.2 19z"' + F + '/>',
+    mountain: '<path d="M2.5 19.5 9 8l4 6.5 2.5-4 6 9z"/><path d="M2.5 19.5h19"/>',
+    shape: '<path d="M4.5 8.5 12 3.5l7.5 5-2 10.5h-11z"/>',
+    tee: '<circle cx="12" cy="7.5" r="3.8"/><path d="M8.8 13.5h6.4l-2 7.5h-2.4z"/>',
+    minus: '<path d="M5 12h14"/>',
+    expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    folder: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/>',
+    download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
+    warn: '<path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.4v.1"/>',
+    shield: '<path d="M12 3 4.5 6v5.5c0 4.5 3 7.7 7.5 9.5 4.5-1.8 7.5-5 7.5-9.5V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+    layers: '<path d="m12 3.5 9 5-9 5-9-5z"/><path d="m3 12.5 9 5 9-5"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    down: '<path d="m6 9 6 6 6-6"/>',
+    up: '<path d="m6 15 6-6 6 6"/>',
+    ruler: '<path d="m3 17 14-14 4 4L7 21z"/><path d="m8 8 2 2M11 5l2 2M5 11l2 2M14 14l2 2M11 17l2 2"/>',
   };
   const ic = (n, cls) => '<svg class="ico ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
   const DIFF_ICON = { chill: 'leaf', standard: 'flag', pro: 'trophy', insane: 'skull' };
@@ -451,6 +469,7 @@
         '<button class="hbtn lbl" data-act="hud-look" title="Look around (hold L / right-drag)">' + ic('eye') + '<small>Look</small></button>' +
       '</div>' +
       '<div class="hud-br">' +
+        '<button class="hbtn lbl hidden" data-act="hud-editcopy" title="Open a copy of this hole in the editor">' + ic('edit') + '<small>Edit copy</small></button>' +
         '<button class="hbtn lbl hidden" data-act="hud-showme" title="Show me: watch the bot solve this hole">' + ic('bulb') + '<small class="sm-t">Show me</small></button>' +
         '<button class="hbtn lbl" data-act="hud-restart" title="Restart hole (R)">' + ic('replay') + '<small>Restart</small></button>' +
         '<button class="hbtn lbl mull" data-act="hud-mull" title="Mulligan: take the last shot again">' + ic('undo') + '<small class="mtxt">Mulligan</small><span class="mcount"></span></button>' +
@@ -468,6 +487,7 @@
     hudEls.restart = hud.querySelector('[data-act="hud-restart"]');
     hudEls.look = hud.querySelector('[data-act="hud-look"]');
     hudEls.showme = hud.querySelector('[data-act="hud-showme"]');
+    hudEls.editcopy = hud.querySelector('[data-act="hud-editcopy"]');
     acts0 = {
       'hud-pause': () => App().pause(),
       'hud-mute': () => App().toggleMute(),
@@ -475,6 +495,7 @@
       'hud-look': () => App().toggleLook(),
       'hud-mull': () => { const s = App().session; if (s && s.mulligan()) toast('Mulligan!', 'info'); },
       'hud-restart': () => App().restartHole(),
+      'hud-editcopy': () => { if (G.MyHoles) G.MyHoles.editRunCopy(); },
       'hud-showme': () => { const v = App().showMe(); if (v) toast('Watch the ghost — that\'s one way to do it', 'info', 1600); },
       'coach-min': () => { coachMin = !coachMin; renderCoach(); },
       'coach-show': () => { const v = App().showMe(); if (v) { coachMin = true; renderCoach(); } },
@@ -548,7 +569,7 @@
   function updateHud(info, extra) {
     if (!info) return;
     extra = extra || {};
-    const key = [info.name, info.par, info.strokes, info.bonus, info.limit, info.mull, info.canMull, info.spin, info.putt, info.tokens ? info.tokens.got + '/' + info.tokens.n : '', extra.sub, extra.kicker, extra.mode, extra.total && extra.total.value, G.Audio.isMuted(), extra.allowRestart, App().lookToggle].join('|');
+    const key = [info.name, info.par, info.strokes, info.bonus, info.limit, info.mull, info.canMull, info.spin, info.putt, info.tokens ? info.tokens.got + '/' + info.tokens.n : '', extra.sub, extra.kicker, extra.mode, extra.total && extra.total.value, G.Audio.isMuted(), extra.allowRestart, extra.editCopy, App().lookToggle].join('|');
     if (key !== hudKey) {
       hudKey = key;
       hudEls['h-kicker'].textContent = extra.kicker || 'Hole';
@@ -616,6 +637,7 @@
       hudEls['ck-h'].textContent = fmtTime(ck.hole);
       hudEls['ck-r'].textContent = ck.round ? fmtTimeS(ck.round) : '';
     } else hudEls['h-clock'].classList.add('hidden');
+    hudEls.editcopy.classList.toggle('hidden', !extra.editCopy);
     hudEls.showme.classList.toggle('hidden', !extra.showMe);
     hudEls.showme.classList.toggle('on', !!info.showMe);
     hudEls['sm-t'].textContent = info.showMe ? 'Hide' : 'Show me';
@@ -829,7 +851,8 @@
           '<button class="tile hero" style="--d:.1s" data-act="go" data-to="courses"><span class="tile-ic">' + ic('play') + '</span><span class="hero-b"><span class="tile-l">Play courses</span>' +
             '<span class="tile-s">' + (nc ? 'Up next: #' + Pg.courseNumber(nc) + ' ' + esc(nc.name) : cleared + ' courses cleared') + '</span></span><span class="hero-go">' + ic('next') + '</span></button>' +
           '<div class="tgrid">' +
-            '<button class="tile mp-tile" style="--d:.14s" data-act="go" data-to="mpSetup"><span class="tile-ic">' + ic('users') + '</span><span class="mp-tile-b"><span class="tile-l">Multiplayer</span><span class="tile-s">Pass &amp; play · 2–4 players, one device</span></span></button>' +
+            '<div class="tile-pair"><button class="tile mp-tile" style="--d:.14s" data-act="go" data-to="mpSetup"><span class="tile-ic">' + ic('users') + '</span><span class="mp-tile-b"><span class="tile-l">Multiplayer</span><span class="tile-s">Pass &amp; play · 2–4 players</span></span></button>' +
+            '<button class="tile mp-tile ed-tile" style="--d:.16s" data-act="go" data-to="editorHub"><span class="tile-ic">' + ic('edit') + '</span><span class="mp-tile-b"><span class="tile-l">Editor</span><span class="tile-s">' + (G.MyHoles ? G.MyHoles.summary() : 'Make &amp; share holes') + '</span></span></button></div>' +
             tile('endless', 'infinity', 'Endless', 'Survival run', 0) + tile('daily', 'calendar', 'Daily', streakTxt(), 1) +
             tile('random', 'dice', 'Random', 'Shareable seeds', 2) + tile('practice', 'target', 'Practice', 'Any hole, any time', 3) +
             tile('tutorials', 'grad', 'Tutorials', tutTxt(), 4) + tile('achievements', 'medal', 'Achievements', achTxt(), 5) +
@@ -1048,22 +1071,24 @@
     const s = App().session, run = App().run;
     const m = s ? s.mull.left : 0;
     const mp = !!(run && run.kind === 'multi' && run.mp);
-    const ex = run ? (run.kind === 'course' ? (G.Progress.ROUND_NAMES[run.round] || '') : run.kind === 'endless' ? 'Endless' : mp ? 'Multiplayer' : cap(run.kind)) : '';
+    const ex = run ? (run.kind === 'course' ? (G.Progress.ROUND_NAMES[run.round] || '') : run.kind === 'endless' ? 'Endless' : mp ? 'Multiplayer' : run.kind === 'custom' ? (run.custom && run.custom.mode === 'shared' ? 'Shared hole' : 'Test play') : cap(run.kind)) : '';
     render('<div class="center-col"><div class="card pop pause-card"><div class="card-k">' + ic('pause') + 'Paused' + (mp ? ' · ' + esc(run.mp.players[run.mp.turn].name) + '\'s turn' : '') + '</div>' +
       (s ? '<h2 class="ttl">' + esc(s.hole.name) + '</h2><div class="kv-row"><span><small>Par</small><b>' + s.hole.par + '</b></span><span><small>Strokes</small><b>' + s.S.strokes + '</b></span>' + (ex ? '<span><small>Mode</small><b>' + esc(ex) + '</b></span>' : '') + '</div>' : '<h2 class="ttl">Paused</h2>') +
       '<div class="menu">' +
       '<button class="btn big primary" data-act="resume">' + ic('play') + 'Resume</button>' +
-      (run && (run.kind === 'dev' || run.kind === 'practice' || run.kind === 'tutorial') ? '<button class="btn big" data-act="restart">' + ic('replay') + 'Restart hole</button>' : '') +
-      (s && (run.kind === 'practice' || run.kind === 'tutorial') && s.hasBotHint() ? '<button class="btn big" data-act="showme">' + ic('bulb') + (s.botGhost ? 'Hide hint' : 'Show me') + '</button>' : '') +
+      (run && (run.kind === 'dev' || run.kind === 'practice' || run.kind === 'tutorial' || run.kind === 'custom') ? '<button class="btn big" data-act="restart">' + ic('replay') + 'Restart hole</button>' : '') +
+      (s && (run.kind === 'practice' || run.kind === 'tutorial' || run.kind === 'custom') && s.hasBotHint() ? '<button class="btn big" data-act="showme">' + ic('bulb') + (s.botGhost ? 'Hide hint' : 'Show me') + '</button>' : '') +
+      (run && run.kind === 'custom' && run.custom.mode === 'shared' ? '<button class="btn big" data-act="editcopy">' + ic('edit') + 'Edit a copy</button>' : '') +
       (m !== 0 ? '<button class="btn big ' + (s && s.canMulligan() ? '' : 'disabled') + '" data-act="mull">' + ic('undo') + 'Mulligan <small>' + (m === Infinity ? 'unlimited' : m + ' left') + '</small></button>' : '') +
-      (run && (mp || (run.kind !== 'endless' && run.scores.length)) ? '<button class="btn big" data-act="card">' + ic('card') + 'Scorecard</button>' : '') +
+      (run && (mp || (run.kind !== 'endless' && run.kind !== 'custom' && run.scores.length)) ? '<button class="btn big" data-act="card">' + ic('card') + 'Scorecard</button>' : '') +
       '<div class="menu-2"><button class="btn" data-act="settings">' + ic('settings') + 'Settings</button>' +
-      '<button class="btn danger" data-act="quit">' + ic('home') + (run && (run.kind === 'practice' || run.kind === 'tutorial') ? 'Quit' : mp ? 'Quit game' : 'Quit round') + '</button></div></div>' +
+      '<button class="btn danger" data-act="quit">' + ic('home') + (run && (run.kind === 'practice' || run.kind === 'tutorial') ? 'Quit' : run && run.kind === 'custom' ? (run.custom.mode === 'test' ? 'Back to editor' : 'Quit') : mp ? 'Quit game' : 'Quit round') + '</button></div></div>' +
       '<div class="keys"><span><kbd>Drag</kbd> aim</span><span><kbd>←→↑↓</kbd><kbd>Space</kbd> shoot</span><span><kbd>B</kbd><kbd>T</kbd> spin</span><span><kbd>L</kbd> look</span><span><kbd>M</kbd> mute</span></div></div></div>', 'pause dim');
     on({
       resume: () => { click(); App().resume(); }, back: () => App().resume(),
       restart: () => { click(); App().resume(); App().restartHole(); },
       showme: () => { click(); App().resume(); App().showMe(); },
+      editcopy: () => { click(); if (G.MyHoles) G.MyHoles.editRunCopy(); },
       mull: () => { click(); App().resume(); if (s && s.mulligan()) toast('Mulligan!', 'info'); },
       settings: () => { click(); show('settings', { ret: 'pause' }); },
       card: () => { click(); show(mp ? 'mpScorecard' : 'scorecard', { ret: 'pause' }); },
@@ -1618,7 +1643,7 @@
     // building blocks for screens that live in other files (game/multi.js)
     kit: {
       SCREENS, render, on, show, click, scr, keepScroll, esc, cap, ic, iconBtn, topbar, section, diffChip, swatch, gimBadge, courseGim, scv, relPar, relCls, relTag,
-      scoreTiles, fmtTime, fmtTimeS, cosCanvas, bindPreviews, toast, copyText, A,
+      scoreTiles, fmtTime, fmtTimeS, cosCanvas, bindPreviews, toast, copyText, A, gimIcon,
     },
   };
 })();
