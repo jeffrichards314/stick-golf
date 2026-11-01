@@ -75,11 +75,8 @@
     flood: { name: 'Flood', desc: 'Water rises with every stroke; a submerged ball fails the hole.', tip: 'Climb high and finish fast before the tide catches you.' },
   };
 
-  const GIMMICKS = ['pad', 'conveyor', 'boost', 'bumper', 'oneway', 'fan', 'wind', 'breakable', 'sticky', 'ricochet', 'teleport',
-    'cushion', 'spinner', 'movplat', 'gate', 'skim', 'rotplat', 'cannon', 'lowgrav', 'tokens', 'seesaw', 'glass', 'zipline',
-    'floatpool', 'ring', 'magnet', 'door', 'geyser', 'catapult', 'quicksand', 'windmill', 'pendulum', 'pipe', 'bubble', 'drag',
-    'portal', 'antigrav', 'toggle', 'piston', 'vanish', 'crumble', 'gwell', 'sidegrav', 'spikes', 'saw', 'laser', 'slowmo', 'mine',
-    'crusher', 'phase', 'tornado', 'blackhole', 'fog', 'decoy', 'movcup', 'liftcup', 'blinkcup', 'shrinkcup', 'flood'];
+  // Introduction order: no two consecutive courses (or any within two) introduce gimmicks from the same PACK.
+  const GIMMICKS = ['bumper', 'pad', 'conveyor', 'oneway', 'boost', 'sticky', 'wind', 'fan', 'ricochet', 'breakable', 'cushion', 'spinner', 'teleport', 'movplat', 'gate', 'skim', 'rotplat', 'lowgrav', 'cannon', 'seesaw', 'tokens', 'zipline', 'glass', 'quicksand', 'ring', 'floatpool', 'windmill', 'geyser', 'magnet', 'pendulum', 'door', 'drag', 'catapult', 'pipe', 'antigrav', 'bubble', 'spikes', 'gwell', 'piston', 'fog', 'saw', 'toggle', 'decoy', 'sidegrav', 'vanish', 'movcup', 'laser', 'portal', 'liftcup', 'slowmo', 'mine', 'blinkcup', 'crumble', 'crusher', 'shrinkcup', 'phase', 'tornado', 'blackhole', 'flood'];
 
   const PACKS = [
     { id: 'launch', name: 'Launchers & Lifts', gimmicks: ['pad', 'fan', 'cannon', 'catapult', 'geyser', 'boost', 'ring', 'bubble', 'tornado'] },
@@ -102,7 +99,7 @@
       '#88b8d8 #e4eef2 #b0b8a0 #8f9c78 #5c6a4a #7fb85a #44702f #e0a040 #26301c'],
     ['Speedway Straights', 'boost', 'Long flat runways where chevron strips rocket putts toward distant greens.', 'fairway', 'rough', 'oob', 'mesa', 'dust', 'city',
       '#f2a65a #fde2b8 #d8a878 #b8845a #7a5238 #a6c25a #6a7a34 #ff3b3b #2e1a0c'],
-    ['Pinball Prairie', 'bumper', 'Bumpers dot the open grassland — bank off them like a pinball wizard.', 'rough', 'fairway', 'oob', 'rolling', 'petals', 'hills',
+    ['Pinball Prairie', 'bumper', 'Bumpers dot the open grassland — bank off them like a pinball wizard.', 'rough', 'fairway', 'oob', 'rolling', 'petals', 'forest',
       '#f0b46a #fde7c0 #d8b884 #c09a60 #8a6a3c #b8c252 #6e7030 #ff3d7f #3a2a14'],
     ['Ledgeway Lofts', 'oneway', 'Stacked wooden ledges let shots rise through from below and land on top.', 'fairway', 'rough', 'oob', 'terraces', 'leaves', 'forest',
       '#9ec8e0 #eaf4e8 #9cb894 #6f9a6a #3e5e40 #78b860 #3e6a30 #f4b13c #182a16'],
@@ -170,7 +167,7 @@
       '#2a1a48 #a060c0 #7a4a8a #5e386e #3a2048 #c09a68 #7a5e3a #ff8a20 #f8e8ff'],
     ['Topsy-Turvy Vaults', 'antigrav', 'Gravity flips in the vaults — balls fall up and rest on the ceilings.', 'fairway', 'rough', 'oob', 'caves', 'stars', 'ruins',
       '#2a2418 #6a5a3a #5a4c34 #483c28 #2a2218 #a08a5a #6a5a38 #40ffd0 #f4ead0'],
-    ['Flip-Switch Factory', 'toggle', 'One switch, two sets of walls — flip it to swap which path is open.', 'fairway', 'rough', 'oob', 'terraces', 'sparks', 'gears',
+    ['Flip-Switch Factory', 'toggle', 'One switch, two sets of walls — flip it to swap which path is open.', 'fairway', 'rough', 'oob', 'terraces', 'sparks', 'city',
       '#5a6468 #a8b0b0 #7a8480 #606a66 #3a4240 #7a9a58 #3a4630 #ffcc00 #e8eee8'],
     ['Piston Foundry', 'piston', 'Hydraulic pistons punch out of the foundry walls to launch or block the ball.', 'rough', 'fairway', 'lava', 'canyon', 'embers', 'volcano',
       '#2a0e0e #8a2a14 #5a2a20 #441c18 #2a100e #8a6a4a #4a3226 #ffa020 #ffe8d0'],
@@ -194,7 +191,7 @@
       '#3a3028 #c08050 #8a6448 #6e4e38 #44302a #a49058 #6a5a34 #ff5020 #fff0d8'],
     ['Crusher Canyon', 'crusher', 'Stone crushers slam down on a rhythm — shoot under them between drops.', 'rough', 'fairway', 'lava', 'canyon', 'embers', 'volcano',
       '#1a0808 #6a1a10 #4a1a14 #38120e #200a08 #7a5a48 #382620 #ff3a10 #ffd8c0'],
-    ['Phantom Phase Fields', 'phase', 'Ghostly blocks fade in and out with each stroke — odd and even shots play different courses.', 'fairway', 'rough', 'oob', 'rolling', 'stars', 'crystals',
+    ['Phantom Phase Fields', 'phase', 'Ghostly blocks fade in and out with each stroke — odd and even shots play different courses.', 'fairway', 'rough', 'oob', 'rolling', 'stars', 'ruins',
       '#1a1630 #3c3060 #4a3c78 #3a2e64 #221a40 #6a9ab8 #3e5470 #6ff0ff #e0f0ff'],
     ['Twister Plains', 'tornado', 'Roaming tornadoes sweep across the plains, lifting any ball they catch.', 'fairway', 'rough', 'oob', 'rolling', 'rain', 'clouds',
       '#46607a #a6bccc #7890a0 #5a7486 #34485a #8aaa62 #4e6a3a #ffd040 #142030'],
@@ -216,6 +213,8 @@
       '#0e3a5a #3a8aa8 #2a6a80 #1e5468 #10303e #b8a878 #6e6444 #50ffb0 #d8f4ff'],
   ];
 
+  // DEFS is authored per gimmick; play order follows GIMMICKS (c01 = plain golf first)
+  DEFS.sort((x, y) => (x[1] ? GIMMICKS.indexOf(x[1]) + 1 : 0) - (y[1] ? GIMMICKS.indexOf(y[1]) + 1 : 0));
   const COURSES = DEFS.map((d, i) => {
     const id = 'c' + String(i + 1).padStart(2, '0');
     const cols = d[9].split(' ');

@@ -29,9 +29,19 @@
   function cached(id) { return cache[id] || null; }
 
   // ---------- progress ----------
+  // The course ORDER changed in v3 (ids are by position), so old progress is invalid: new key 'progress3'.
+  const PKEY = 'progress3';
   let prog = null;
-  function P() { if (!prog) { prog = Store.get('progress', null) || { c: {} }; if (!prog.c) prog.c = {}; } return prog; }
-  function save() { Store.set('progress', P()); }
+  function P() { if (!prog) { prog = Store.get(PKEY, null) || { c: {} }; if (!prog.c) prog.c = {}; } return prog; }
+  function save() { Store.set(PKEY, P()); }
+  // true once if the player had progress under the old course order (caller shows a friendly notice)
+  function migrationNotice() {
+    if (Store.get('progressNotice3', false)) return false;
+    const old = Store.get('progress', null);
+    Store.set('progressNotice3', true);
+    if (old && old.c && Object.keys(old.c).length) { Store.del('progress'); return true; }
+    return false;
+  }
   function cprog(id) { const p = P(); return p.c[id] || (p.c[id] = { h: [] }); }
   function holeRec(id, i) { const c = P().c[id]; return c && c.h[i] ? c.h[i] : null; }
 
@@ -73,6 +83,23 @@
     return nb;
   }
   function recordCourseTotal(id, total) { return recordRound(id, 'all', total); } // legacy alias
+  // Remix (mirrored) rounds keep their own bests: c.rx = {all, front, back}
+  function recordRemix(id, round, total) {
+    const c = cprog(id); c.rx = c.rx || {};
+    let nb = false;
+    if (c.rx[round] === undefined || total < c.rx[round]) { c.rx[round] = total; nb = true; }
+    save(); return nb;
+  }
+  function remixBests(id) { const c = P().c[id]; return (c && c.rx) || {}; }
+  function remixAvailable(id) { return ALL || courseInfo(id).cleared; }
+  // best times (seconds) per round key ('all'|'front'|'back'|'rx-all'...), only recorded for rounds under par
+  function recordTime(id, key, secs) {
+    const c = cprog(id); c.tm = c.tm || {};
+    let nb = false;
+    if (c.tm[key] === undefined || secs < c.tm[key]) { c.tm[key] = Math.round(secs * 10) / 10; nb = true; }
+    save(); return nb;
+  }
+  function bestTimes(id) { const c = P().c[id]; return (c && c.tm) || {}; }
   function nineInfo(id, c, ps, a, b) {
     let stars = 0, done = 0, best = 0, par = 0, allPar = true;
     for (let i = a; i < b; i++) {
@@ -134,6 +161,31 @@
   let seenG = null;
   function seenSet() { if (!seenG) seenG = new Set(Store.get('seenGimmicks', []) || []); return seenG; }
   function gimmickSeen(t) { return seenSet().has(t); }
+  function seenCount() { return seenSet().size; }
+
+  // ---------- tutorials (kept across the v3 progress reset) ----------
+  let tutDone = null;
+  function tutSet() { if (!tutDone) tutDone = new Set(Store.get('tutorialsDone', []) || []); return tutDone; }
+  function hasTutorials() { return !!(G.TUTORIALS && typeof G.TUTORIALS === 'object' && Object.keys(G.TUTORIALS).length); }
+  function tutorialHole(t) { return hasTutorials() ? G.TUTORIALS[t] || null : null; }
+  function tutorialDone(t) { return tutSet().has(t); }
+  function markTutorialDone(t) {
+    const s = tutSet(); if (s.has(t)) return false;
+    s.add(t); Store.set('tutorialsDone', [...s]);
+    const st = Store.getStats(); st.tutorials = s.size; Store.set('stats', st);
+    return true;
+  }
+  function tutorialsDoneCount() { return tutSet().size; }
+  // gimmick tutorials only (the plain-golf 'basics' controls tutorial doesn't count toward tutorials_all)
+  function gimmickTutorialsDone() { let n = 0; tutSet().forEach((t) => { if (t !== 'basics') n++; }); return n; }
+  function tutorialTotal() { return (((G.Manifest && G.Manifest.GIMMICKS) || []).length || 59) + (tutorialHole('basics') ? 1 : 0); }
+  // A gimmick is available in Endless once its tutorial is done (?unlock=all bypasses). If the tutorial data is not
+  // shipped at all, fall back to "the course that introduces it was cleared" so Endless is never permanently plain.
+  function gimmickUnlocked(t) {
+    if (ALL || tutSet().has(t)) return true;
+    if (!hasTutorials()) { const M = G.Manifest, cid = M && M.introducedBy && M.introducedBy[t]; return !!(cid && courseInfo(cid).cleared); }
+    return false;
+  }
   function markGimmicksSeen(ts) { const s = seenSet(); let ch = false; (ts || []).forEach((t) => { if (!s.has(t)) { s.add(t); ch = true; } }); if (ch) Store.set('seenGimmicks', [...s]); }
 
   // ---------- cosmetics ----------
@@ -185,6 +237,11 @@
       if (type === 'cleared') return memo.cleared !== undefined ? memo.cleared : (memo.cleared = clearedCount());
       if (type === 'course') return u && u.id && courseInfo(u.id).cleared ? 1 : 0;
       if (type === 'gimmicks') return seenSet().size;
+      if (type === 'achievement') return u && u.id && G.Achievements && G.Achievements.has(u.id) ? 1 : 0;
+      if (type === 'achievements') return G.Achievements ? G.Achievements.count() : 0;
+      if (type === 'fastrounds') return +st.fastRounds || 0;
+      if (type === 'tutorials') return tutSet().size;
+      if (type === 'remix') return +st.remixRounds || 0;
       if (type === 'free') return 1;
       return +st[type] || 0;
     };
@@ -205,20 +262,27 @@
       case 'daily': return 'Finish ' + plural(n, 'daily round');
       case 'endless': return 'Clear ' + plural(n, 'hole') + ' in one Endless run';
       case 'gimmicks': return 'Encounter ' + plural(n, 'different gimmick');
+      case 'achievement': { const a = G.Achievements && G.Achievements.byId[r.id]; return 'Earn the achievement “' + (a ? a.name : r.id) + '”'; }
+      case 'achievements': return 'Earn ' + plural(n, 'achievement');
+      case 'fastrounds': return 'Finish ' + plural(n, 'fast round') + ' (under par, < 20 s per par)';
+      case 'tutorials': return 'Complete ' + plural(n, 'tutorial');
+      case 'remix': return 'Finish ' + plural(n, 'Remix round');
       default: return 'Locked';
     }
   }
-  const REQ_LABEL = { stars: 'Stars', cleared: 'Courses cleared', course: 'Course', swishes: 'Swishes', aces: 'Aces', birdies: 'Birdies', holes: 'Holes', rounds: 'Rounds', daily: 'Daily rounds', endless: 'Best run', gimmicks: 'Gimmicks' };
+  const REQ_LABEL = { stars: 'Stars', cleared: 'Courses cleared', course: 'Course', swishes: 'Swishes', aces: 'Aces', birdies: 'Birdies', holes: 'Holes', rounds: 'Rounds', daily: 'Daily rounds', endless: 'Best run', gimmicks: 'Gimmicks',
+    achievement: 'Achievement', achievements: 'Achievements', fastrounds: 'Fast rounds', tutorials: 'Tutorials', remix: 'Remix rounds' };
   // {ok, cur, need, frac, text, label, prog} for a requirement
   function evalReq(r, get) {
     get = get || snapshot();
     if (!r || r.type === 'free') return { ok: true, cur: 1, need: 1, frac: 1, text: 'Free', label: '', prog: '' };
-    const need = r.type === 'course' ? 1 : Math.max(1, +r.n || 1);
+    const single = r.type === 'course' || r.type === 'achievement';
+    const need = single ? 1 : Math.max(1, +r.n || 1);
     const raw = get(r.type, r);
     const cur = ALL ? need : Math.min(need, raw);
     const ok = ALL || raw >= need;
     const label = REQ_LABEL[r.type] || r.type;
-    return { ok, cur, need, frac: need ? cur / need : 1, text: reqText(r), label, prog: r.type === 'course' ? (ok ? 'Cleared' : 'Not cleared yet') : label + ' ' + cur + '/' + need };
+    return { ok, cur, need, frac: need ? cur / need : 1, text: reqText(r), label, prog: r.type === 'course' ? (ok ? 'Cleared' : 'Not cleared yet') : r.type === 'achievement' ? (ok ? 'Earned' : 'Not earned yet') : label + ' ' + cur + '/' + need, single };
   }
   function reqMet(r) { return evalReq(r).ok; }
   function rarityOf(item, i, n, req) {
@@ -242,7 +306,7 @@
         cat: c,
         items: list.map((it, i) => {
           const r = cosReq(c.key, it, i), e = evalReq(r, get);
-          return { item: it, req: r, ok: e.ok, text: e.text, cur: e.cur, need: e.need, frac: e.frac, prog: e.prog, label: e.label, rarity: rarityOf(it, i, list.length, r), isNew: e.ok && nw.has(c.key + ':' + it.id) };
+          return { item: it, req: r, ok: e.ok, text: e.text, cur: e.cur, need: e.need, frac: e.frac, prog: e.prog, label: e.label, single: !!e.single, rarity: rarityOf(it, i, list.length, r), isNew: e.ok && nw.has(c.key + ':' + it.id) };
         }),
       };
     });
@@ -300,6 +364,8 @@
       const sc = res.score !== undefined ? res.score : res.strokes;
       if (res.swish) st.swishes = (st.swishes || 0) + 1;
       if (res.strokes === 1) st.aces = (st.aces || 0) + 1;
+      if (res.swish && res.strokes === 1) st.swishAces = (st.swishAces || 0) + 1;
+      if (res.spin) st.spinHoles = (st.spinHoles || 0) + 1;
       if (sc < res.par) st.birdies = (st.birdies || 0) + 1;
       if (sc <= res.par - 2) st.eagles = (st.eagles || 0) + 1;
       if (sc <= res.par) st.pars = (st.pars || 0) + 1;
@@ -310,20 +376,45 @@
 
   // ---------- daily bests ----------
   function dailyBest(date) { const d = Store.get('daily', {}) || {}; return d[date] || null; }
-  function recordDaily(date, total, par, strokes) {
+  // res: per-hole result codes for the share card ('A' ace/eagle+, 'B' birdie, 'P' par, 'O' bogey, 'D' worse, 'X' pickup; '*' suffix = swish)
+  function recordDaily(date, total, par, strokes, res, time) {
     const d = Store.get('daily', {}) || {};
     const prev = d[date];
-    if (!prev || total < prev.total) { d[date] = { total, par, strokes }; Store.set('daily', d); return true; }
-    return false;
+    let nb = false;
+    if (!prev || total < prev.total) { d[date] = { total, par, strokes, res: res || null, time: time || null, plays: (prev ? prev.plays || 1 : 0) + 1 }; nb = true; }
+    else { prev.plays = (prev.plays || 1) + 1; }
+    Store.set('daily', d);
+    const s = dailyStreak(); Store.maxStat('dailyStreak', s.cur);
+    return nb;
   }
+  function dayStr(dt) { const p = (n) => (n < 10 ? '0' : '') + n; return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate()); }
+  // consecutive days with a finished daily, ending today (or yesterday if today isn't played yet); best = longest ever
+  function dailyStreak() {
+    const d = Store.get('daily', {}) || {};
+    const has = (k) => !!d[k];
+    const now = new Date(); now.setHours(12, 0, 0, 0);
+    const day = new Date(now);
+    if (!has(dayStr(day))) day.setDate(day.getDate() - 1);
+    let cur = 0;
+    while (has(dayStr(day))) { cur++; day.setDate(day.getDate() - 1); }
+    const keys = Object.keys(d).sort(); let best = 0, run = 0, prev = null;
+    keys.forEach((k) => { const t = new Date(k + 'T12:00:00'); run = prev && Math.round((t - prev) / 864e5) === 1 ? run + 1 : 1; best = Math.max(best, run); prev = t; });
+    return { cur, best: Math.max(best, cur) };
+  }
+  function dailyHistory() { const d = Store.get('daily', {}) || {}; return Object.keys(d).sort().reverse().map((k) => Object.assign({ date: k }, d[k])); }
 
   G.Progress = {
     ALL, loadCourse, cached, baked, pars, def, courses,
     holeRec, recordHole, recordCourseTotal, recordRound, courseInfo, ROUNDS, ROUND_NAMES, holeCount, roundRange, roundsFor, roundFor, totalStars, completedCount,
     unlocked, unlockText, prevId, courseNumber, gimmickSeen, markGimmicksSeen, cats, cosList, cosReq, evalReq, reqText, cosmeticsState, equipped, equip,
     newUnlocks, newUnlockItems, unlockedSet, isNew, markSeen, markCatSeen, newCount, RARITIES, clearedCount, recordHoleStats, stats,
-    dailyBest, recordDaily,
-    resetAll() { prog = { c: {} }; save(); seenG = new Set(); Store.del('seenGimmicks'); Store.del('newItems'); if (Store.resetStats) Store.resetStats(); },
+    dailyBest, recordDaily, dailyStreak, dailyHistory, migrationNotice, seenCount,
+    recordRemix, remixBests, remixAvailable, recordTime, bestTimes,
+    hasTutorials, tutorialHole, tutorialDone, markTutorialDone, tutorialsDoneCount, gimmickTutorialsDone, tutorialTotal, gimmickUnlocked,
+    resetAll() {
+      prog = { c: {} }; save(); seenG = new Set(); Store.del('seenGimmicks'); Store.del('newItems'); if (Store.resetStats) Store.resetStats();
+      tutDone = new Set(); Store.del('tutorialsDone'); Store.del('daily'); Store.del('tutOffered'); if (G.Achievements) G.Achievements.reset();
+    },
   };
   Object.defineProperty(G.Progress, 'CATS', { get: cats, enumerable: true });
 })();

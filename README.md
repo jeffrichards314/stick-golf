@@ -1,6 +1,6 @@
 # Stick Golf
 
-A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is vanilla JS on an HTML5 canvas, with geometric shape art and procedural WebAudio sound effects (no music). There are no dependencies.
+A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is vanilla JS on an HTML5 canvas, with geometric shape art and procedural WebAudio sound effects and optional ambient music (off by default). There are no dependencies.
 
 * **60 courses × 18 holes = 1,080 holes.** Play all 18, the front 9 (easier) or the back 9 (harder).
 * **The 60 courses come one after another, each its own concept.** Course 1 is plain golf. Every course after it introduces **one new gimmick**, for **59 gimmicks** in all. Its holes are built around that gimmick, which is usually the only way to the cup: walls no swing can clear, chasms wider than a full-power shot, sealed vaults, tunnels through mountains. Later holes in each course mix in gimmicks from earlier courses.
@@ -12,6 +12,23 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
 ## Play online
 
 **https://jeffrichards314.github.io/stick-golf/** (hosted with GitHub Pages from the `main` branch; every push redeploys it).
+
+## Modes & features
+
+* **Courses:** 60 courses × 18 holes, played as rounds: All 18, Front 9 (easier) or Back 9 (harder). Finish a full round under par to unlock the next course.
+* **Remix:** once you've cleared a course under par, you can play it mirrored (tee on the right). Remixes keep their own personal bests.
+* **Tutorials:** "The Basics" walks through the controls and sits next to course 1. There is also one teaching hole for each of the 59 gimmicks. Completing a gimmick's tutorial makes it available in **Endless**. Tutorials have a "Show me" button that replays the bot's solution as a ghost ball.
+* **Practice:** play any single hole of any unlocked course, with unlimited restarts and "Show me".
+* **Daily Challenge:** a seeded 9-hole course each day. Results go on a local leaderboard with streaks, and an emoji share card can be copied or shared.
+* **Endless:** fully customisable. Gimmicks unlock as you complete their tutorials.
+* **Previous shot:** while you aim, a ghost ball replays your last shot, and the last aim and power are marked.
+* **Clocks:** time is tracked per hole and per round. Fast rounds under par earn achievements and cosmetics.
+* **Progression:** 36 achievements, 139 cosmetics in 5 Locker categories (balls, trails, cup effects, flags, palettes), and a lifetime Stats screen.
+* **Settings:**
+  * difficulty and feel: difficulty (Chill / Standard / Pro / Insane), haptics, optional music;
+  * accessibility: colour-blind mode (patterns and shapes instead of colour alone), reduced effects, larger touch targets, high contrast;
+  * aiming: separate touch and mouse sensitivity, and precision putting.
+* **Human-feel par:** the build replays every bot solution with small aim and power errors. Holes whose shots need pixel-perfect precision get up to +2 par.
 
 ## Run
 

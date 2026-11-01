@@ -166,3 +166,36 @@ Manifest.PACKS  // [{id, name, gimmicks:[...]}] gimmick categories (Endless togg
 Manifest.introducedBy[type] -> course id
 ```
 Endless `settings.gimmicks` may contain any of the 59 types. No music anywhere.
+
+## v3 additions (tutorials, remix, practice, achievements, time)
+
+### Data
+* `data/tutorials.js` → `GOLF.TUTORIALS = { <gimmickType>: hole }` — one short, bot-verified teaching hole per gimmick (59).
+  `hole.tutorial = type`, normal hole JSON otherwise (has `par`, `bot.shots`). Node: `module.exports`.
+* Every baked hole has `bot: { s, shots:[[angle, power], ...] }` — the verified solution (usable as a "show me" ghost / hint).
+* Course ORDER was reshuffled (ids c01..c60 are by position): saved progress keyed by course id must be migrated/reset
+  (bump the progress storage key and tell the player once).
+
+### Generator additions
+* `GOLF.Generator.mirrorHole(hole)` → deep-copied, left↔right mirrored hole (tee on the right). Its `bot.shots` are mirrored
+  too and remain valid (verified offline for all 1080 holes). Used by **Remix** rounds.
+
+### Achievements (ids are fixed; the client evaluates them, cosmetics may reference them)
+first_hole, first_round, under_par_round, ace, ace5, swish, swish10, swish_ace, birdie10, birdie100, eagle,
+clean_nine (9 holes, no bogeys), perfect_round (18 holes, every hole ≤ par), no_mulligan_round (18 holes, 0 mulligans),
+lightning_hole (hole under par in < 8 s), speed_nine (nine under par in < 3 min), speed_18 (18 under par in < 8 min),
+courses10, courses30, courses60 (courses cleared under par), tutorials_all (all 59 tutorials), gimmick_hunter (met 30 gimmicks),
+gimmick_master (met all 59), daily3 / daily7 (daily streak of 3 / 7 days), endless10 / endless25 / endless50 (holes in one endless run),
+remix_round, remix_under_par, practice50 (50 practice holes), spin_doctor (25 holes finished with a spin shot),
+pro_round (any round under par on Pro), insane_round (finish any round on Insane), comeback (hole under par after a hazard on it),
+marathon (1000 lifetime strokes).
+
+### Extra cosmetic unlock types
+`{type:'achievement', id}` · `{type:'achievements', n}` (count earned) · `{type:'fastrounds', n}` (rounds finished under par AND
+faster than 20 s × round par) · `{type:'tutorials', n}` (tutorial holes completed) · `{type:'remix', n}` (remix rounds finished).
+
+### Frame additions for the renderer (`R.draw(frame)`)
+* `frame.ghost = { points:[x0,y0,...], t }` — translucent ghost ball replaying the previous shot (or the bot hint); t = 0..1 progress.
+* `frame.prevAim = { angle, power }` — draw a faint marker of the previous shot's aim/power on the aim UI.
+* `frame.a11y = { colorblind:bool, reducedFx:bool }` — colour-blind-safe hazards (patterns/shapes, not just colour; decoy tell by shape),
+  reduced effects (fewer particles/ambient motion).

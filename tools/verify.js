@@ -168,6 +168,36 @@ function runtimeCases() {
     else pass('every enabler course needs its gimmick on at least half of holes 2-18');
   }
 
+  // ---- 5b. remix (mirrored) holes + tutorials ----
+  console.log('\n[R] Remix rounds: every mirrored hole is valid and its stored mirrored solution replays within par+2');
+  {
+    let ok = 0, n = 0; const bad = [];
+    for (const c of courses) for (const h of c.holes || []) {
+      if (!h) continue; n++;
+      const m = G.mirrorHole(h), e = G.validateHole(m);
+      const rp = L.Bot.replay(m, m.bot.shots.map(([a, p]) => ({ a, p })));
+      if (!e.length && rp.ok && rp.strokes <= h.par + 2) ok++; else bad.push(h.id + (e.length ? ':' + e[0] : ''));
+    }
+    if (bad.length) fail(`remix holes failing: ${bad.length} (${bad.slice(0, 8).join(' ')})`); else pass(`${ok}/${n} remix holes verified`);
+  }
+  console.log('\n[T] Tutorials: Basics + one per gimmick, valid and bot-verified');
+  {
+    let T = null; try { T = require('../data/tutorials.js'); } catch (e) { /* missing */ }
+    if (!T) fail('data/tutorials.js missing');
+    else {
+      const need = ['basics'].concat(L.M.COURSES.filter((c) => c.gimmick).map((c) => c.gimmick));
+      const missing = need.filter((t) => !T[t]), bad = [];
+      for (const t of need) {
+        const h = T[t]; if (!h) continue;
+        const e = G.validateHole(h), rp = L.Bot.replay(h, h.bot.shots.map(([a, p]) => ({ a, p })), null, true);
+        if (e.length || !rp.ok || (t !== 'basics' && !G.engaged(h, rp.path))) bad.push(t);
+      }
+      if (missing.length) fail('tutorials missing: ' + missing.join(','));
+      if (bad.length) fail('tutorials failing: ' + bad.join(','));
+      if (!missing.length && !bad.length) pass(`${need.length} tutorials (Basics + ${need.length - 1} gimmicks) verified; each gimmick tutorial engages its gimmick`);
+    }
+  }
+
   // ---- 5. runtime generators ----
   if (!args.includes('--no-runtime')) {
     console.log('\n[5] Endless / Daily / Random generators — 500 seeds & settings combos');

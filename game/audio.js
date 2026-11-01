@@ -1,4 +1,4 @@
-/* Procedural WebAudio sound effects. No samples, no music. */
+/* Procedural WebAudio sound effects, optional generative ambient music (off by default) and haptics. */
 (function () {
   'use strict';
   const G = window.GOLF = window.GOLF || {};
@@ -157,5 +157,111 @@
   G.Audio = {
     sfx, resume, setMute, setVolumes,
     isMuted: () => muted, get ctx() { return ctx; },
+  };
+
+  // ---------------- generative ambient music ----------------
+  // Soft pads + a sparse arpeggio over a slow 4-chord loop. The key/mode/tempo vary with the course (palette index).
+  // Fully stopped (no oscillators, no timer) when off.
+  const MODES = [
+    [0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 2, 4, 6, 7, 9, 11], [0, 2, 3, 5, 7, 9, 10], [0, 2, 4, 5, 7, 9, 11], [0, 2, 3, 7, 8],
+  ];
+  const ROOTS = [57, 60, 55, 62, 58, 53, 59, 56];
+  const PROGS = [[0, 3, 4, 2], [0, 4, 2, 3], [0, 2, 3, 1], [0, 3, 1, 4]];
+  const Music = { on: false, vol: 0.45, idx: 0, bus: null, timer: 0, next: 0, step: 0, voices: [], delay: null };
+  function mBus() {
+    if (!ensure()) return null;
+    if (!Music.bus) {
+      Music.bus = ctx.createGain(); Music.bus.gain.value = 0;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+      Music.bus.connect(lp); lp.connect(master);
+      const d = ctx.createDelay(1.5), fb = ctx.createGain(), wet = ctx.createGain();
+      d.delayTime.value = 0.45; fb.gain.value = 0.35; wet.gain.value = 0.35;
+      d.connect(fb); fb.connect(d); d.connect(wet); wet.connect(Music.bus);
+      Music.delay = d;
+    }
+    return Music.bus;
+  }
+  function mVoice(freq, t0, dur, o) {
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = o.type || 'sine'; osc.frequency.value = freq; if (o.det) osc.detune.value = o.det;
+    const a = o.a || 0.02, v = o.v || 0.05;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(v, t0 + a);
+    g.gain.setValueAtTime(v, t0 + Math.max(a, dur - (o.r || 0.3)));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(Music.bus); if (o.send && Music.delay) g.connect(Music.delay);
+    osc.start(t0); osc.stop(t0 + dur + 0.05);
+    const vo = { osc, end: t0 + dur + 0.1 };
+    Music.voices.push(vo);
+    osc.onended = () => { const i = Music.voices.indexOf(vo); if (i >= 0) Music.voices.splice(i, 1); try { g.disconnect(); } catch (e) { /* */ } };
+  }
+  function mTick() {
+    if (!Music.on || !ctx) return;
+    if (ctx.state !== 'running') return;
+    const k = Music.idx | 0, scale = MODES[k % MODES.length], root = ROOTS[(k * 3) % ROOTS.length] - 12;
+    const prog = PROGS[(k >> 1) % PROGS.length], beat = 0.62 + ((k * 7) % 5) * 0.06, bar = beat * 8;
+    const deg = (i) => { const n = scale.length, o = Math.floor(i / n); return root + scale[((i % n) + n) % n] + 12 * o; };
+    if (Music.next < ctx.currentTime) Music.next = ctx.currentTime + 0.1;
+    while (Music.next < ctx.currentTime + 0.8) {
+      const t = Music.next, st = Music.step, inBar = st % 8, chord = prog[Math.floor(st / 8) % prog.length];
+      if (inBar === 0) {
+        [0, 2, 4].forEach((d, i) => {
+          const f = mtof(deg(chord + d) + 12);
+          mVoice(f, t, bar + 1.2, { type: 'triangle', v: 0.022, a: 1.4, r: 1.6, det: i * 4 - 4 });
+          mVoice(f * 1.003, t, bar + 1.2, { type: 'sine', v: 0.018, a: 1.8, r: 1.6 });
+        });
+        mVoice(mtof(deg(chord) - 12 + 12), t, bar, { type: 'sine', v: 0.035, a: 0.6, r: 1.2 });
+      }
+      // sparse arpeggio (deterministic-ish per step)
+      const h = Math.sin((st + 1) * 12.9898 + k * 78.233) * 43758.5453, r = h - Math.floor(h);
+      if (r < 0.55 && inBar !== 7) {
+        const pick = [0, 2, 4, 7, 9][Math.floor(r * 9.1) % 5];
+        mVoice(mtof(deg(chord + pick) + 24), t, beat * 1.6, { type: 'sine', v: 0.03, a: 0.01, r: beat * 1.2, send: true });
+      }
+      Music.next += beat; Music.step++;
+    }
+  }
+  function musicOn(v) {
+    v = !!v;
+    if (v === Music.on && (!v || Music.timer)) return;
+    Music.on = v;
+    if (v) {
+      if (!mBus()) { Music.on = false; return; }
+      Music.bus.gain.cancelScheduledValues(ctx.currentTime);
+      Music.bus.gain.setTargetAtTime(Music.vol * 0.9, ctx.currentTime, 0.6);
+      Music.next = 0; Music.step = 0;
+      Music.timer = setInterval(mTick, 200); mTick();
+    } else {
+      if (Music.timer) clearInterval(Music.timer); Music.timer = 0;
+      if (ctx && Music.bus) {
+        const t = ctx.currentTime;
+        Music.bus.gain.cancelScheduledValues(t); Music.bus.gain.setTargetAtTime(0, t, 0.15);
+        Music.voices.slice().forEach((vo) => { try { vo.osc.stop(t + 0.6); } catch (e) { /* */ } });
+      }
+    }
+  }
+  G.Music = {
+    set(on, vol) { if (vol !== undefined) { Music.vol = +vol; if (Music.on && ctx && Music.bus) Music.bus.gain.setTargetAtTime(Music.vol * 0.9, ctx.currentTime, 0.2); } musicOn(on); },
+    setTheme(idx) { idx = (idx | 0) || 0; if (idx === Music.idx) return; Music.idx = idx; if (Music.on && ctx) { Music.step = Math.ceil(Music.step / 8) * 8; } },
+    get on() { return Music.on; }, get voices() { return Music.voices.length; }, get running() { return !!Music.timer; },
+  };
+  // resume music scheduling after the first user gesture
+  ['pointerdown', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { if (Music.on && !Music.timer) { Music.on = false; musicOn(true); } }, { passive: true }));
+
+  // ---------------- haptics ----------------
+  const canVibrate = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+  const PATTERNS = { shot: [14], bounce: [6], hole: [20, 50, 30, 50, 60], hazard: [60, 40, 60], unlock: [15, 40, 15, 40, 45], tick: [4], fail: [80] };
+  let lastBuzz = 0;
+  G.Haptics = {
+    supported: canVibrate,
+    buzz(kind) {
+      if (!canVibrate) return;
+      const s = G.Store && G.Store.getSettings ? G.Store.getSettings() : {};
+      if (s.haptics === false) return;
+      const now = performance.now();
+      if (kind === 'bounce' && now - lastBuzz < 140) return;
+      lastBuzz = now;
+      try { navigator.vibrate(PATTERNS[kind] || [10]); } catch (e) { /* */ }
+    },
   };
 })();

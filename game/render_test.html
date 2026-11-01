@@ -26,6 +26,10 @@
   <select id="flag"></select>
   <label><input type="checkbox" id="follow"> follow ball</label>
   <label>zoom <input type="range" id="zoom" min="0.4" max="2" step="0.05" value="1"></label>
+  <label><input type="checkbox" id="ghost"> ghost</label>
+  <label><input type="checkbox" id="prevaim"> last aim</label>
+  <label><input type="checkbox" id="cb"> colour-blind</label>
+  <label><input type="checkbox" id="rfx"> reduced fx</label>
   <button id="brk">break/gate/crumble</button>
   <button id="hole">holed fx</button>
   <button id="fxall">new fx</button>
@@ -132,7 +136,7 @@
     document.body.style.overflow = 'auto'; document.body.style.height = 'auto';
     document.getElementById('c').style.display = 'none'; document.getElementById('prev').style.display = 'none'; document.getElementById('ui').style.display = 'none';
     const RC = { common: '#9aa3ad', rare: '#3aa0ff', epic: '#b57aff', legendary: '#ffb020' };
-    const ut = (u) => !u ? '?' : u.type === 'free' ? 'free' : u.type === 'course' ? 'course ' + u.id : u.type + ' ' + u.n;
+    const ut = (u) => !u ? '?' : u.type === 'free' ? 'free' : u.type === 'course' ? 'course ' + u.id : u.type === 'achievement' ? 'ach ' + u.id : u.type + ' ' + u.n;
     const wrap = document.createElement('div'); wrap.style.cssText = 'padding:12px 16px;';
     const cells = []; const dpr = Math.min(2, window.devicePixelRatio || 1); const CW = Math.round(128 * (+qs0.get('sz') || 1)), CH = Math.round(96 * (+qs0.get('sz') || 1));
     for (const cat of RD.COSMETIC_CATS) {
@@ -172,6 +176,7 @@
   cos.palette = $('pal').value; cos.ball = $('ball').value;
   if (qs.get("follow")) $("follow").checked = true;
   if (qs.get("z")) $("zoom").value = qs.get("z");
+  ['ghost', 'prevaim', 'cb', 'rfx'].forEach((k) => { if (qs.get(k)) $(k).checked = true; });
   if (qs.get("noui")) { $("ui").style.display = "none"; $("prev").style.display = "none"; }
 
   const canvas = $('c');
@@ -200,7 +205,7 @@
   const shots = [[-0.9, 0.55], [-0.6, 0.7], [-1.1, 0.45], [-0.4, 0.8], [-0.75, 0.6]];
   const fog = new Float32Array(hole.gm.length);
   let shake = { x: 0, y: 0 }, shakeA = 0;
-  let aimA = -0.8, lastCam = null;
+  let aimA = -0.8, lastCam = null, ghostPts = null, ghostT0 = 0, prevAim = null;
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const time = fixedT !== null ? fixedT : now / 1000;
@@ -247,7 +252,13 @@
       const pts = [S.x, S.y];
       for (let k = 0; k < 160; k++) { const r = Ph.step(W, c); if (k % 3 === 0) pts.push(c.x, c.y); if (r) break; }
       aim = { x: S.x, y: S.y, angle: aimA, power: pw, points: pts, spin, putt };
-      if (restT > 1.8 && fixedT === null && !qs.get('noshoot')) { Ph.shoot(W, S, aimA, pw, spin); shotN++; restT = 0; }
+      if (restT > 1.8 && fixedT === null && !qs.get('noshoot')) {
+        // record the full shot for the ghost replay
+        const g = Ph.cloneState(S); g.ev = null; Ph.shoot(W, g, aimA, pw, spin); const gp = [S.x, S.y];
+        for (let k = 0; k < 900; k++) { const r = Ph.step(W, g); if (k % 3 === 0) gp.push(g.x, g.y); if (r || g.rest) break; }
+        ghostPts = gp; ghostT0 = time; prevAim = { angle: aimA, power: pw };
+        Ph.shoot(W, S, aimA, pw, spin); shotN++; restT = 0;
+      }
     } else if (S.holed || S.failed) { restT += dt; if (restT > 3) { S = Ph.initState(W); restT = 0; R.trailClear(); } }
     for (let i = 0; i < hole.gm.length; i++) {
       const g = hole.gm[i]; if (g.t !== 'fog') continue;
@@ -262,7 +273,9 @@
     else { const camT = fixedT !== null ? (qs.get('cx') ? 0 : fixedT) : time; cam = { x: qs.get('cx') ? +qs.get('cx') : 400 + (hole.w - 800) * (0.5 - 0.5 * Math.cos(camT * 0.07)), y: qs.get('cy') ? +qs.get('cy') : 700, zoom: z }; }
     const t0 = performance.now();
     lastCam = cam;
-    R.draw({ cam, W, S, aim, fogReveal: fog, shake, time, dt });
+    if (!prevAim && qs.get('noshoot')) prevAim = { angle: -1.1, power: 0.4 };
+    const ghost = $('ghost').checked && ghostPts ? { points: ghostPts, t: ((time - ghostT0) % 4) / 3 > 1 ? 1 : ((time - ghostT0) % 4) / 3 } : null;
+    R.draw({ cam, W, S, aim, fogReveal: fog, shake, time, dt, ghost, prevAim: $('prevaim').checked ? prevAim : null, a11y: { colorblind: $('cb').checked, reducedFx: $('rfx').checked } });
     fpsT += dt; frames++;
     if (fpsT > 0.5) { $('fps').textContent = Math.round(frames / fpsT) + ' fps, draw ' + (performance.now() - t0).toFixed(1) + 'ms'; fpsT = 0; frames = 0; }
     requestAnimationFrame(loop);
@@ -273,7 +286,7 @@
     const p = R.screenToWorld(ev.clientX, ev.clientY, lastCam);
     S.x = p[0]; S.y = p[1]; S.vx = 0; S.vy = 0; S.hold = false; S.rest = false; S.ride = -1; S.bub = -1; S.cannon = -1; S.stuck = false; S.holed = false; S.failed = null; restT = 0; R.trailClear();
   });
-  window.__T = { R, hole, spawn: (k, x, y) => R.spawn(k, x, y), get S() { return S; }, W: () => W };
+  window.__T = { R, hole, setGhost: (pts) => { ghostPts = pts; ghostT0 = performance.now() / 1000; }, spawn: (k, x, y) => R.spawn(k, x, y), get S() { return S; }, W: () => W };
 })();
 </script>
 </body>

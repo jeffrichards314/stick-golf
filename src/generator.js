@@ -223,6 +223,72 @@
     return h;
   }
 
+  // ---------------- remix: left↔right mirror ----------------
+  // Physics is symmetric, so a mirrored hole plays identically with mirrored shots (angle a → π − a).
+  function mirrorHole(hole) {
+    const W = hole.w, h = JSON.parse(JSON.stringify(hole));
+    const X = (x) => W - x, A = (a) => Math.PI - a, RX = (x, w) => W - x - w;
+    const g = hole.ground, pts = [];
+    for (let i = g.length - 2; i >= 0; i -= 2) pts.push(X(g[i]), g[i + 1]);
+    h.ground = pts; h.gs = hole.gs.split('').reverse().join('');
+    h.solids = hole.solids.map((so) => {
+      const p = []; for (let i = so.p.length - 2; i >= 0; i -= 2) p.push(X(so.p[i]), so.p[i + 1]);
+      // edges reverse with the point order: edge i (p_i→p_{i+1}) becomes edge n-2-i (mod n)
+      let s2 = so.s;
+      if (so.s.length > 1) { const n = so.p.length / 2, e = so.s.split(''); s2 = ''; for (let k = 0; k < n; k++) s2 += e[(n - 2 - k + n) % n] || e[0]; }
+      return { p, s: s2 };
+    });
+    h.tee = [X(hole.tee[0]), hole.tee[1]];
+    h.cup = [X(hole.cup[0]), hole.cup[1]];
+    if (hole.green) h.green = [X(hole.green[1]), X(hole.green[0])];
+    const rect = (o) => { o.x = RX(o.x, o.w); };
+    const seg = (o) => { o.x = X(o.x); o.x2 = X(o.x2); };
+    const rects = (list) => list.map((r) => [RX(r[0], r[2]), r[1], r[2], r[3]]);
+    const ptsX = (p) => p.map((v, i) => (i % 2 ? v : X(v)));
+    h.gm = hole.gm.map((o0) => {
+      const o = JSON.parse(JSON.stringify(o0));
+      switch (o.t) {
+        case 'wind': o.ax = -o.ax; if (o.w !== undefined) rect(o); break;
+        case 'fan': rect(o); o.ang = A(o.ang); break;
+        case 'sidegrav': rect(o); o.gx = -o.gx; break;
+        case 'lowgrav': case 'antigrav': case 'slowmo': case 'drag': case 'breakable': case 'door': case 'vanish':
+        case 'sticky': case 'crumble': case 'glass': case 'fog': case 'skim': rect(o); break;
+        case 'floatpool': rect(o); o.cur = -(o.cur || 0); break;
+        case 'gate': rect(o); o.sx = X(o.sx); break;
+        case 'piston': rect(o); o.dx = -o.dx; break;
+        case 'crusher': rect(o); break;
+        case 'movplat': o.x = RX(o.x, o.w); o.x2 = RX(o.x2, o.w); break;
+        case 'windmill': case 'rotplat': o.x = X(o.x); o.w = -o.w; o.ph = Math.PI - (o.ph || 0); break;
+        case 'seesaw': o.x = X(o.x); break;
+        case 'pendulum': o.x = X(o.x); o.A = -o.A; break;
+        case 'spinner': o.x = X(o.x); o.w = -o.w; break;
+        case 'pad': case 'ring': case 'catapult': o.x = X(o.x); o.ang = A(o.ang); break;
+        case 'cannon': o.x = X(o.x); o.ang = A(o.ang); o.amp = -(o.amp || 0); break;
+        case 'bumper': case 'gwell': case 'blackhole': case 'mine': case 'geyser': o.x = X(o.x); break;
+        case 'bubble': o.x = X(o.x); o.dx = -(o.dx || 0); break;
+        case 'teleport': seg(o); break;
+        case 'portal': seg(o); o.a = A(o.a); o.a2 = A(o.a2); break;
+        case 'conveyor': case 'boost': case 'oneway': case 'cushion': case 'ricochet': case 'spikes':
+        case 'quicksand': case 'laser': case 'magnet': case 'zipline': case 'saw': seg(o); break;
+        case 'tornado': o.x = X(o.x); if (o.x2 !== undefined) o.x2 = X(o.x2); break;
+        case 'pipe': o.p = ptsX(o.p); break;
+        case 'tokens': case 'decoy': case 'blinkcup': o.pts = ptsX(o.pts); break;
+        case 'toggle': o.sx = X(o.sx); o.a = rects(o.a); o.b = rects(o.b); break;
+        case 'phase': o.blocks = rects(o.blocks); break;
+        case 'liftcup': o.x = X(o.x); break;
+        case 'movcup': { const a = X(o.x2), b = X(o.x1); o.x1 = a; o.x2 = b; o.ph = (o.ph || 0) + 0.5; break; }
+        default: break;
+      }
+      return o;
+    });
+    // baked holes carry a verified mirrored solution (mbot); otherwise mirror the original shots
+    if (hole.mbot) h.bot = { s: hole.mbot.s, shots: hole.mbot.shots };
+    else if (hole.bot) h.bot = { s: hole.bot.s, shots: hole.bot.shots.map(([a, p]) => [A(a), p]) };
+    delete h.mbot;
+    h.id = hole.id + 'm'; h.remix = true;
+    return h;
+  }
+
   // ---------------- courses ----------------
   // 18 holes: front nine (1-9) easier, back nine (10-18) harder
   const HOLES = 18;
@@ -432,6 +498,6 @@
   return {
     generateHole, validateHole, finalizePar, engaged, withoutSig, courseHoleParams, coursePlan, courseDifficulty,
     endlessHole, dailyCourse, randomCourse, retryParams, ENDLESS_PRESETS, ROLES, HOLES, ALL_GIMMICKS, PASSIVE,
-    gimmickBoxes, gimmickBox, pieceDef, launchLanding, tuneLaunch,
+    gimmickBoxes, gimmickBox, pieceDef, launchLanding, tuneLaunch, mirrorHole,
   };
 });

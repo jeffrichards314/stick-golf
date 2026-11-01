@@ -11,6 +11,29 @@
   const SPIN_STEPS = [-1, -0.5, 0, 0.5, 1];
   const FAIL_TEXT = { flood: 'Swamped by the rising tide!', limit: 'Stroke limit!' };
   const popcount = (v) => { v = v >>> 0; let n = 0; while (v) { n += v & 1; v >>>= 1; } return n; };
+  const PUTT_ZONE = 0.4; // precision putting: the normal drag range covers 0..40% power, dragging further reaches 100%
+  const settings = () => (G.Store && G.Store.getSettings ? G.Store.getSettings() : {});
+  const reducedFx = () => !!(G.Store && G.Store.reducedFx && G.Store.reducedFx());
+
+  // Replay a list of shots [[a,p,s?]|{a,p,s}] from the tee in a CLONED world; returns sampled path [x,y,...] (every 2 steps).
+  function simulatePath(hole, shots, maxSteps) {
+    const Ph = G.Physics;
+    const W = Ph.createWorld(hole, { gspeed: 1, windMul: 1, hazardPenalty: 1, rec: false });
+    const S = Ph.initState(W); S.ev = null;
+    const list = (shots || []).map((x) => (Array.isArray(x) ? { a: x[0], p: x[1], s: x[2] || 0 } : x));
+    const pts = [S.x, S.y];
+    let si = 0, n = 0, idle = 0;
+    maxSteps = maxSteps || 30000;
+    for (let i = 0; i < maxSteps; i++) {
+      if (S.rest && !S.holed && si < list.length) { const q = list[si++]; Ph.shoot(W, S, q.a, q.p, q.s || 0); }
+      const r = Ph.step(W, S);
+      if (S.ev) S.ev.length = 0;
+      if (++n % 2 === 0) pts.push(S.x, S.y);
+      if (r === 1 || r === 4) { pts.push(S.x, S.y); break; }
+      if (S.rest && si >= list.length) { if (++idle > 30) break; } else idle = 0;
+    }
+    return pts;
+  }
 
   function create(o) {
     const Ph = G.Physics, C = Ph.C;
@@ -28,8 +51,10 @@
       aim: null, drag: null, kAim: null, preview: null, prevKey: null, prevT: 0,
       shakeMag: 0, shake: { x: 0, y: 0 }, mull: o.mulligans || { left: diff.mulligans },
       lastHz: null, queue: [], trailT: 0, result: null, onEvent: o.onEvent || null, failReason: null,
+      // v3: previous shot + ghost replay, hole clock, per-hole flags
+      lastShot: null, rec: null, ghostPts: null, ghostT0: -1, botGhost: null, clock: 0, hazards: 0, lastSpin: 0,
     };
-    P.kAimDefault = () => ({ angle: hole.cup[0] >= P.S.x ? -Math.PI / 4 : -3 * Math.PI / 4, power: 0.55 });
+    P.kAimDefault = () => (P.lastShot ? { angle: P.lastShot.angle, power: P.lastShot.power } : { angle: hole.cup[0] >= P.S.x ? -Math.PI / 4 : -3 * Math.PI / 4, power: 0.55 });
 
     cam.setHole(hole, !o.demo && o.intro !== false);
     if (R) { R.setHole(hole, o.theme, o.cosmetics || {}); R.trailClear(); }
@@ -40,7 +65,8 @@
     P.effSpin = () => (P.isPutt() ? 0 : P.spin);
     P.score = () => P.S.strokes - (P.S.bonus || 0);
 
-    function addShake(m) { if (G.Store.getSettings().shake !== false) P.shakeMag = Math.max(P.shakeMag, m); }
+    function addShake(m) { if (settings().shake !== false && !reducedFx()) P.shakeMag = Math.max(P.shakeMag, m); }
+    const buzz = (k) => { if (!P.demo && G.Haptics) G.Haptics.buzz(k); };
     function fx(kind, x, y, op) { if (R) { try { R.spawn(kind, x, y, op || {}); } catch (e) { /* renderer fx optional */ } } }
 
     P.shoot = function (angle, power, spin) {
@@ -50,7 +76,13 @@
       P.snaps.push({ S: Ph.cloneState(P.S), fog: P.fog.slice() });
       if (P.snaps.length > 30) P.snaps.shift();
       const sp = P.isPutt() ? 0 : (spin === undefined ? P.spin : spin);
-      Ph.shoot(W, P.S, angle, Math.max(0.02, Math.min(1, power)), sp);
+      const pw = Math.max(0.02, Math.min(1, power));
+      Ph.shoot(W, P.S, angle, pw, sp);
+      P.lastShot = { angle, power: pw, spin: sp };
+      P.lastSpin = sp;
+      P.rec = { pts: [P.S.x, P.S.y], n: 0 };
+      P.ghostT0 = -1;
+      if (P.botGhost && !P.botGhost.keep) P.botGhost = null;
       P.aim = null; P.drag = null; P.preview = null; P.prevKey = null;
       if (P.kAim) P.kAim.active = false;
       return true;
@@ -58,18 +90,26 @@
 
     // ---- input handlers ----
     P.tap = function () { if (cam.inIntro()) { cam.skipIntro(); return true; } return false; };
-    P.aimStart = function (sx, sy) {
+    P.aimStart = function (sx, sy, ptype) {
       if (P.demo || P.paused || P.state !== 'play') return false;
       if (!P.canShoot()) return false; // pan instead
-      P.drag = { sx, sy, cx: sx, cy: sy };
+      P.drag = { sx, sy, cx: sx, cy: sy, pt: ptype || 'mouse' };
       return true;
     };
-    P.aimMove = function (sx, sy) {
+    P.precise = () => !!(settings().precisionPutt !== false && P.isPutt());
+    // drag fraction (1 = full normal drag) -> power
+    P.powerFromFrac = function (f) {
+      if (!P.precise()) return Math.min(1, f);
+      return f <= 1 ? PUTT_ZONE * f : Math.min(1, PUTT_ZONE + (1 - PUTT_ZONE) * (f - 1) / 0.75);
+    };
+    P.aimMove = function (sx, sy, ptype) {
       if (!P.drag) return;
       P.drag.cx = sx; P.drag.cy = sy;
       const dx = P.drag.sx - sx, dy = P.drag.sy - sy, L = Math.hypot(dx, dy);
       if (L < DEAD) { P.aim = null; return; }
-      P.aim = { angle: Math.atan2(dy, dx), power: Math.min(1, (L - DEAD * 0.5) / MAX_DRAG) };
+      const st = settings(), touch = (ptype || P.drag.pt) === 'touch' || (ptype || P.drag.pt) === 'pen';
+      const sens = Math.max(0.3, Math.min(3, +(touch ? st.sensTouch : st.sensMouse) || 1));
+      P.aim = { angle: Math.atan2(dy, dx), power: P.powerFromFrac(Math.max(0, (L - DEAD * 0.5) * sens / MAX_DRAG)) };
     };
     P.aimEnd = function (sx, sy, cancel) {
       if (!P.drag) return;
@@ -148,6 +188,7 @@
       const sn = P.snaps.pop();
       P.S = Ph.cloneState(sn.S); P.fog = sn.fog.slice();
       if (P.mull.left !== Infinity) P.mull.left--;
+      P.mull.used = (P.mull.used || 0) + 1;
       P.state = 'play'; P.stateT = 0; P.acc = 0; P.aim = null; P.drag = null; P.failReason = null;
       if (R) R.trailClear();
       A.sfx('teleport');
@@ -162,6 +203,8 @@
       P.queue = [];
       P.S = Ph.initState(W); P.fog.fill(0); P.snaps = []; P.state = 'play'; P.stateT = 0; P.acc = 0;
       P.aim = null; P.drag = null; P.kAim = null; P.result = null; P.failReason = null; P.reported = false;
+      P.rec = null; P.clock = 0; P.hazards = 0; P.lastSpin = 0; P.ghostT0 = -1;
+      if (P.botGhost && !P.botGhost.keep) P.botGhost = null;
       if (R) R.trailClear();
       cam.setHole(hole, false);
     };
@@ -173,12 +216,13 @@
       for (let i = 0; i < ev.length; i++) {
         const e = ev[i];
         switch (e.e) {
-          case 'shot': A.sfx('swing', { p: e.p }); if (R) R.trailClear(); fx('dust', e.x, e.y + 5, { m: e.p }); break;
+          case 'shot': buzz('shot'); A.sfx('swing', { p: e.p }); if (R) R.trailClear(); fx('dust', e.x, e.y + 5, { m: e.p }); break;
           case 'bounce': {
             const m = Math.min(1, e.m / 900);
             fx('bounce', e.x, e.y, { surf: e.s, m: e.m });
             if (e.s === 's') fx('sand', e.x, e.y, { m: e.m });
             A.sfx('bounce', { s: e.s, m });
+            if (e.m > 450) buzz('bounce');
             if (e.m > 700) addShake(2 + m * 3);
             break;
           }
@@ -200,7 +244,8 @@
             else if (k === 'quicksand') { fx('sink', e.x, e.y); A.sfx('sink'); }
             else if (k === 'decoy') { fx('pop', e.x, e.y); A.sfx('decoy'); }
             else { fx('spark', e.x, e.y, { m: 1 }); A.sfx('hazard'); }
-            addShake(7);
+            addShake(7); buzz('hazard');
+            if (!P.demo) P.hazards++;
             if (R) R.trailClear();
             if (!P.demo) {
               const pen = W.opts.hazardPenalty;
@@ -208,7 +253,7 @@
             }
             break;
           }
-          case 'holed': fx('holed', e.x, e.y, { effect: cos.cupEffect }); fx('confetti', e.x, e.y - 20); A.sfx('cup'); addShake(3); break;
+          case 'holed': fx('holed', e.x, e.y, { effect: cos.cupEffect }); fx('confetti', e.x, e.y - 20); A.sfx('cup'); addShake(3); buzz('hole'); break;
           case 'swish':
             fx('swish', e.x, e.y); A.sfx('swish'); addShake(5);
             if (!P.demo && G.UI) G.UI.swishBanner();
@@ -285,6 +330,7 @@
       if (P.paused) return;
       P.time += dt;
       P.stateT += dt;
+      if (!P.demo && P.state === 'play' && P.S.strokes > 0 && !P.S.holed) P.clock += dt;
       if (keys) P.keyboardAim(dt, keys);
       // fixed-step physics (keeps running while aiming)
       P.acc += Math.min(dt, 0.1);
@@ -296,6 +342,14 @@
           const q = P.queue.shift(); cam.skipIntro(); P.shoot(q.a, q.p, q.s || 0);
         }
         const r = Ph.step(W, P.S);
+        if (P.rec) {
+          if (++P.rec.n % 2 === 0) P.rec.pts.push(P.S.x, P.S.y);
+          if (r !== 0 || P.rec.pts.length > 12000) {
+            if (r !== 2) P.rec.pts.push(P.S.x, P.S.y);
+            if (P.rec.pts.length >= 6) P.ghostPts = P.rec.pts;
+            P.rec = null;
+          }
+        }
         if (r === 1) { if (P.state === 'play') { P.state = 'holed'; P.stateT = 0; } break; }
         if (r === 4 || P.S.failed) { if (P.state === 'play') { P.state = 'failed'; P.stateT = 0; P.failReason = P.S.failed || 'flood'; } break; }
         if (r === 2 || r === 3) {
@@ -315,13 +369,13 @@
       // transitions
       if (P.state === 'holed' && !P.result) {
         const bonus = S.bonus || 0, score = S.strokes - bonus;
-        P.result = { holed: true, strokes: S.strokes, bonus, score, swish: !!S.swish, par: hole.par, label: G.Modes.scoreLabel(score, hole.par) };
+        P.result = { holed: true, strokes: S.strokes, bonus, score, swish: !!S.swish, par: hole.par, label: G.Modes.scoreLabel(score, hole.par), time: P.clock, hazards: P.hazards, spin: P.lastSpin };
         if (!P.demo && G.UI) { if (S.swish) setTimeout(() => G.UI.bigLabel(P.result.label.text, P.result.label.cls), 900); else G.UI.bigLabel(P.result.label.text, P.result.label.cls); }
       }
       if (P.state === 'holed' && P.stateT > (S.swish ? 2.4 : 1.6) && !P.reported) { P.reported = true; o.onHoled && o.onHoled(P.result, P); }
       if (P.state === 'failed' && !P.result) {
         const reason = P.failReason || S.failed || 'limit';
-        P.result = { holed: false, failed: true, reason, text: FAIL_TEXT[reason] || 'Hole failed', strokes: S.strokes, bonus: S.bonus || 0, score: S.strokes - (S.bonus || 0), par: hole.par };
+        P.result = { holed: false, failed: true, reason, text: FAIL_TEXT[reason] || 'Hole failed', strokes: S.strokes, bonus: S.bonus || 0, score: S.strokes - (S.bonus || 0), par: hole.par, time: P.clock, hazards: P.hazards };
         if (!P.demo && G.UI) { G.UI.bigLabel(reason === 'flood' ? 'Swamped!' : 'Stroke limit!', 'fail'); if (reason === 'flood') G.UI.toast(P.result.text, 'hz', 2200); A.sfx('fail'); }
       }
       if (P.state === 'failed' && P.stateT > (P.failReason === 'flood' ? 1.8 : 1.3) && !P.reported) { P.reported = true; o.onFailed && o.onFailed(P.result, P); }
@@ -333,11 +387,36 @@
       if (!a || !P.canShoot()) return null;
       const pts = computePreview(a);
       const putt = P.isPutt();
-      return { x: P.S.x, y: P.S.y, angle: a.angle, power: a.power, points: pts || null, spin: putt ? 0 : P.spin, putt };
+      return { x: P.S.x, y: P.S.y, angle: a.angle, power: a.power, points: pts || null, spin: putt ? 0 : P.spin, putt, precise: P.precise() };
     };
+    // "Show me": the bot's verified solution replayed from the tee in a cloned world, shown as a looping ghost
+    P.hasBotHint = () => !!(hole.bot && hole.bot.shots && hole.bot.shots.length);
+    P.showMe = function (on) {
+      if (on === false || (on === undefined && P.botGhost)) { P.botGhost = null; return false; }
+      if (!P.hasBotHint()) return false;
+      let pts = null;
+      try { pts = simulatePath(hole, hole.bot.shots); } catch (e) { console.warn('[showme]', e); }
+      if (!pts || pts.length < 6) return false;
+      P.botGhost = { points: pts, t0: P.time, dur: pts.length / 2 / 60 };
+      return true;
+    };
+    function ghostFrame() {
+      const loop = (pts, t0, rate) => { const dur = pts.length / 2 / 60 / (rate || 1), per = dur + 0.7; const ph = (P.time - t0) % per; return { points: pts, t: Math.min(1, ph / dur) }; };
+      if (P.botGhost) { const g = loop(P.botGhost.points, P.botGhost.t0, P.botGhost.points.length > 2400 ? 1.6 : 1); g.bot = true; return g; }
+      if (!P.ghostPts || P.demo || settings().ghost === false) { P.ghostT0 = -1; return null; }
+      if (!(P.isAiming() && P.canShoot())) { P.ghostT0 = -1; return null; }
+      if (P.ghostT0 < 0) P.ghostT0 = P.time;
+      return loop(P.ghostPts, P.ghostT0, 1);
+    }
+    P.ghostFrame = ghostFrame;
     P.draw = function (time, dt) {
       if (!R) return;
-      R.draw({ cam: cam.view(), W, S: P.S, aim: P.aimInfo(), fogReveal: P.fog, shake: P.shake, time, dt, spin: P.effSpin(), putt: P.isPutt() });
+      const st = settings(), aim = P.aimInfo();
+      const f = { cam: cam.view(), W, S: P.S, aim, fogReveal: P.fog, shake: P.shake, time, dt, spin: P.effSpin(), putt: P.isPutt(),
+        a11y: { colorblind: !!st.colorblind, reducedFx: reducedFx() } };
+      const gh = ghostFrame(); if (gh) f.ghost = gh;
+      if (aim && P.lastShot && !P.demo) f.prevAim = { angle: P.lastShot.angle, power: P.lastShot.power };
+      R.draw(f);
     };
     P.windInfo = function () {
       if (!W.globalWind.length) return null;
@@ -355,10 +434,10 @@
       return {
         name: hole.name, par: hole.par, strokes: P.S.strokes, limit, mull: P.mull.left, canMull: P.canMulligan(),
         spin: P.spin, putt: P.isPutt(), score: P.score(), bonus: P.S.bonus || 0, tokens: P.tokenInfo(), wind: P.windInfo(), aim: P.aim || (P.kAim && P.kAim.active ? P.kAim : null), canShoot: P.canShoot(), state: P.state,
-        intro: cam.inIntro(),
+        intro: cam.inIntro(), last: P.lastShot, clock: P.clock, precise: P.precise(), showMe: !!P.botGhost,
       };
     };
     return P;
   }
-  G.Play = { create, MAX_DRAG, SPIN_STEPS, HZ_NAMES };
+  G.Play = { create, MAX_DRAG, SPIN_STEPS, HZ_NAMES, PUTT_ZONE, simulatePath };
 })();

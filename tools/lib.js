@@ -11,7 +11,7 @@ const Bot = require('../src/bot.js');
 
 const ROOT = path.join(__dirname, '..');
 const CACHE = path.join(ROOT, '.cache');
-const MAX_ATTEMPTS = 18;
+const MAX_ATTEMPTS = 26;
 
 function srcHash() {
   const h = crypto.createHash('sha1');
@@ -53,6 +53,41 @@ function isNearDup(h, prior) {
   return prior.some((o) => o && o.gm.map((g) => g.t).sort().join() === sig && similar(p, profileOf(o)) > 0.965);
 }
 
+// Human-feel: how many shots of a solution need pixel-perfect precision? Each shot is re-tried with small aim/power
+// errors (±0.7°, ±2.5%); a shot is "fragile" when most of those land in a hazard or far worse than intended.
+function fragileShots(hole, shots) {
+  const W = P.createWorld(hole), S = P.initState(W), score = Bot.makeScorer(hole);
+  const OFF = [[0.012, 0], [-0.012, 0], [0, 0.025], [0, -0.025], [0.008, 0.018], [-0.008, -0.018]];
+  let fragile = 0;
+  for (let i = 0; i < shots.length; i++) {
+    const [a, p] = shots[i];
+    const ideal = P.cloneState(S), ri = P.simulateShot(W, ideal, a, p, 0);
+    const target = ri === 'holed' ? 0 : score(ideal);
+    let bad = 0;
+    for (const [da, dp] of OFF) {
+      const T = P.cloneState(S), r = P.simulateShot(W, T, a + da, Math.max(0.02, Math.min(1, p * (1 + dp))), 0);
+      if (r === 'hazard' || r === 'fail') { bad++; continue; }
+      const sc = r === 'holed' ? 0 : score(T);
+      if (sc > target + 450) bad++;
+    }
+    if (bad >= 4) fragile++;
+    P.simulateShot(W, S, a, p, 0); // advance along the real solution
+  }
+  return fragile;
+}
+
+// Remix (mirrored) solution: mirrored shots usually replay; otherwise solve the mirrored hole for real.
+function remixSolution(out) {
+  const m = G.mirrorHole(out);
+  const rp = Bot.replay(m, m.bot.shots.map(([a, p]) => ({ a, p })));
+  if (rp.ok) return { s: rp.strokes, shots: m.bot.shots };
+  for (const o of [{ maxStrokes: out.par + 2 }, { maxStrokes: out.par + 2, beam: 8, dense: true }]) {
+    const res = Bot.solve(m, o);
+    if (res.ok) return { s: res.strokes, shots: res.shots.map((x) => [x.a, x.p]) };
+  }
+  return null;
+}
+
 function buildHole(def, k, plan, prior) {
   const tries = [];
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -71,9 +106,72 @@ function buildHole(def, k, plan, prior) {
     G.finalizePar(out, res.strokes);
     out.attempt = attempt;
     out.bot = { s: res.strokes, shots: res.shots.map((s) => [s.a, s.p]) };
+    out.fragile = fragileShots(out, out.bot.shots);
+    out.par += Math.min(2, out.fragile); // precision-heavy holes get a little extra par for humans
+    const mb = remixSolution(out);
+    if (!mb) { tries.push('remix'); continue; }
+    out.mbot = mb;
     return { hole: out, tries };
   }
   return { hole: null, tries };
+}
+
+// One short teaching hole per gimmick (intro piece, difficulty 0), bot-verified.
+// 'basics': the controls tutorial shown next to course 1 (plain golf: carry, bunker, flat putting green).
+function buildBasicsTutorial() {
+  const course = M.COURSES[0], tries = [];
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const hole = G.generateHole({
+      id: 'tut-basics', name: 'Tutorial: The Basics', seed: RNG.hashStr('tutorial:basics:' + attempt), difficulty: 0,
+      style: 'rolling', surfaces: { main: 'fairway', alt: 'rough' }, hazard: 'water', hazardDensity: 0,
+      role: 'intro', theme: course.id, sig: null, wrapper: 'longflat',
+      pieces: [{ g: null, id: 'creek' }, { g: null, id: 'guardedgreen' }],
+    });
+    const errs = G.validateHole(hole);
+    if (errs.length) { tries.push(errs[0]); continue; }
+    const res = Bot.solve(hole, { maxStrokes: hole.par + 2 });
+    if (!res.ok) { tries.push('bot'); continue; }
+    const out = stripPrivate(hole);
+    G.finalizePar(out, res.strokes);
+    out.par = Math.max(out.par, 3);
+    out.tutorial = 'basics';
+    out.bot = { s: res.strokes, shots: res.shots.map((s) => [s.a, s.p]) };
+    return { type: 'basics', hole: out, tries };
+  }
+  return { type: 'basics', hole: null, tries };
+}
+
+function buildTutorial(type) {
+  if (type === 'basics') return buildBasicsTutorial();
+  const D = require('../src/designs/index.js'), des = D.get(type);
+  const course = M.COURSES.find((c) => c.gimmick === type);
+  const intro = des.pieces.find((p) => p.intro) || des.pieces[0];
+  const info = (M.GIMMICK_INFO && M.GIMMICK_INFO[type]) || { name: type };
+  const tries = [];
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const hole = G.generateHole({
+      id: 'tut-' + type, name: 'Tutorial: ' + info.name, seed: RNG.hashStr('tutorial:' + type + ':' + attempt), difficulty: 0,
+      style: course.style, surfaces: { main: course.surface, alt: course.altSurface }, hazard: course.hazard, hazardDensity: 0.2,
+      role: 'intro', theme: course.id, sig: type, wrapper: ['longflat', 'meadow', 'rollers', 'saddle'][attempt % 4],
+      pieces: [{ g: type, id: (attempt < 12 ? intro : des.pieces[attempt % des.pieces.length]).id }],
+    });
+    const errs = G.validateHole(hole);
+    if (errs.length) { tries.push(errs[0]); continue; }
+    const res = Bot.solve(hole, attempt >= 6 ? { maxStrokes: hole.par + 2, beam: 8, dense: true } : { maxStrokes: hole.par + 2 });
+    if (!res.ok) { tries.push('bot'); continue; }
+    const rp = Bot.replay(hole, res.shots, null, true);
+    if (!rp.ok || !G.engaged(hole, rp.path)) { tries.push('unengaged'); continue; }
+    const out = stripPrivate(hole);
+    G.finalizePar(out, res.strokes);
+    out.tutorial = type;
+    out.bot = { s: res.strokes, shots: res.shots.map((s) => [s.a, s.p]) };
+    return { type, hole: out, tries };
+  }
+  return { type, hole: null, tries };
+}
+function writeTutorials(map) {
+  const js = `/* baked by tools/build.js — one teaching hole per gimmick */\n(function(root){var d=${JSON.stringify(map)};\nif(typeof module!=='undefined'&&module.exports)module.exports=d;else{root.GOLF=root.GOLF||{};root.GOLF.TUTORIALS=d;}})(typeof self!=='undefined'?self:this);\n`;
+  fs.writeFileSync(path.join(ROOT, 'data', 'tutorials.js'), js);
 }
 
 // Generate + verify one course. Returns {id, holes, log}
@@ -162,4 +260,4 @@ function loadCourse(id) {
 function readJSON(f, dflt) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return dflt; } }
 function writeJSON(f, v) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(v)); }
 
-module.exports = { RNG, P, G, M, Bot, ROOT, CACHE, srcHash, physHash, holeHash, buildCourse, buildHole, essentialCheck, verifyHole, runtimeCase, writeCourseFile, writeIndex, loadCourse, readJSON, writeJSON };
+module.exports = { RNG, P, G, M, Bot, ROOT, CACHE, srcHash, physHash, holeHash, buildCourse, buildHole, essentialCheck, buildTutorial, writeTutorials, fragileShots, remixSolution, verifyHole, runtimeCase, writeCourseFile, writeIndex, loadCourse, readJSON, writeJSON };

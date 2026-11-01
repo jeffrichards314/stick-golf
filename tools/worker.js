@@ -5,6 +5,7 @@ const L = require('./lib.js');
 parentPort.on('message', (task) => {
   try {
     if (task.type === 'course') parentPort.postMessage(L.buildCourse(L.M.byId[task.id]));
+    else if (task.type === 'tutorial') parentPort.postMessage(L.buildTutorial(task.id));
     else if (task.type === 'try') parentPort.postMessage(require('./try.js').tryHole(task.id, task.k, task.opts));
     else if (task.type === 'verify') parentPort.postMessage(L.verifyHole(task.hole, task.opts));
     else if (task.type === 'runtime') parentPort.postMessage(L.runtimeCase(task.c));

@@ -14,6 +14,7 @@ const { runPool } = require('./pool.js');
   const cacheFile = path.join(L.CACHE, 'build.json');
   const cache = L.readJSON(cacheFile, {});
   const ids = L.M.COURSES.map((c) => c.id).filter((id) => !only.length || only.includes(id));
+  if (args.includes('--tutorials-only')) { only.length = 0; ids.length = 0; args.push('--tutorials'); }
   const todo = ids.filter((id) => force || !cache[id] || cache[id].key !== key + JSON.stringify(L.M.byId[id]).length || !L.loadCourse(id));
   console.log(`build: ${ids.length} courses, ${todo.length} to (re)generate, ${ids.length - todo.length} cached`);
   const t0 = Date.now();
@@ -41,6 +42,16 @@ const { runPool } = require('./pool.js');
     if (holes && holes.length === L.G.HOLES && holes.every(Boolean)) index[c.id] = { pars: holes.map((h) => h.par), names: holes.map((h) => h.name), gimmick: c.gimmick };
   }
   L.writeIndex(index);
+  // tutorials: one teaching hole per gimmick
+  if (!only.length || args.includes('--tutorials')) {
+    const types = ['basics'].concat(L.M.COURSES.filter((c) => c.gimmick).map((c) => c.gimmick));
+    const tres = await runPool(types.map((id) => ({ type: 'tutorial', id })));
+    const map = {}; let tf = 0;
+    for (const r of tres) { if (r && r.hole) map[r.type] = r.hole; else { tf++; console.log('  tutorial FAILED', r && (r.type || r.error), r && r.tries ? r.tries.slice(-4).join(',') : ''); } }
+    L.writeTutorials(map);
+    console.log(`build: ${Object.keys(map).length}/${types.length} tutorials baked`);
+    if (tf) failed++;
+  }
   console.log(`build: ${Object.keys(index).length}/60 courses baked${failed ? `, ${failed} FAILED` : ''}`);
   process.exit(failed ? 1 : 0);
 })();

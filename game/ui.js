@@ -53,6 +53,14 @@
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
     grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    grad: '<path d="M2.5 9 12 4.5 21.5 9 12 13.5z"/><path d="M6.5 11v4.5c0 1.4 2.5 3 5.5 3s5.5-1.6 5.5-3V11M21.5 9v5"/>',
+    mirror: '<path d="M12 3v18"/><path d="M9 7 4 12l5 5z"' + F + '/><path d="m15 7 5 5-5 5z"/>',
+    share: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4M8.2 13.2l7.6 4"/>',
+    music: '<path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"' + F + '/><circle cx="17.5" cy="16" r="2.5"' + F + '/>',
+    phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2M2.5 9v6M21.5 9v6"/>',
+    access: '<circle cx="12" cy="4.5" r="2"' + F + '/><path d="M4.5 8.5 12 10l7.5-1.5M12 10v5l-3 6M12 15l3 6"/>',
+    bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    fire: '<path d="M12 21c-4 0-6.5-2.6-6.5-6.2 0-3.7 3-5.6 4-9.3 2.1 1.4 3 3.3 3 5.1 1-.6 1.6-1.6 1.8-3 2 1.7 4.2 4.2 4.2 7.2 0 3.6-2.5 6.2-6.5 6.2z"/>',
   };
   const ic = (n, cls) => '<svg class="ico ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
   const DIFF_ICON = { chill: 'leaf', standard: 'flag', pro: 'trophy', insane: 'skull' };
@@ -128,15 +136,26 @@
   const relPar = (strokes, par) => { const d = strokes - par; return d === 0 ? 'E' : (d > 0 ? '+' + d : String(d)); };
   const relCls = (strokes, par) => { const d = strokes - par; return d < 0 ? 'under' : d > 0 ? 'over' : 'even'; };
   const relTag = (strokes, par) => '<em class="rel ' + relCls(strokes, par) + '">' + relPar(strokes, par) + '</em>';
+  // the plain-golf controls tutorial ('basics') is not a gimmick but uses the same tutorial plumbing
+  const BASICS = { name: 'Golf basics', desc: 'Aiming, power, spin, putting and the swish — everything you need for course 1.', tip: 'Drag back anywhere, release to shoot.' };
+  const BASICS_STEPS = [
+    ['Aim & shoot', 'Drag back anywhere and release. The ball flies <b>opposite</b> your drag; drag length = power. Drag back to the start to cancel. Keyboard: arrows/WASD aim, Space shoots.'],
+    ['Read the shot', 'Watch the trajectory preview while aiming, and the wind arrow at the top when there is wind. The faint ghost replays your last shot.'],
+    ['Spin', 'Full shots can carry spin: <b>B</b>/<b>T</b>, the mouse wheel or the spin control. Backspin lifts and bites; topspin dives and runs on.'],
+    ['The green', 'The light-striped green: shots from it are <b>putts</b> — no spin' + '<span class="pp-note">, and precision putting gives you a finer power scale</span>' + '.'],
+    ['Swish!', 'Drop the ball straight into the cup without touching the green and you get a <b>Swish</b>: −1 stroke.'],
+    ['Tools', '<b>Look</b> (or hold L) scans the hole; <b>Mulligan</b> undoes a shot; the ❚❚ menu pauses, restarts and opens settings.'],
+  ];
   function gimName(t) {
     if (!t) return '';
+    if (t === 'basics') return BASICS.name;
     const I = G.Manifest && G.Manifest.GIMMICK_INFO;
     const info = I && I[t];
     if (typeof info === 'string') return info;
     if (info && (info.name || info.title)) return info.name || info.title;
     return t.replace(/^mov/, 'moving ').replace(/^rot/, 'rotating ').replace(/^g/, (m) => (t === 'gwell' ? 'gravity ' : m)).replace(/(^|\s)\S/g, (m) => m.toUpperCase());
   }
-  function gimInfo(t) { const I = G.Manifest && G.Manifest.GIMMICK_INFO; const info = I && I[t]; return info && typeof info === 'object' ? info : {}; }
+  function gimInfo(t) { if (t === 'basics') return BASICS; const I = G.Manifest && G.Manifest.GIMMICK_INFO; const info = I && I[t]; return info && typeof info === 'object' ? info : {}; }
   function gimDesc(t) { const i = gimInfo(t); return i.desc || i.description || ''; }
   function gimTip(t) { return gimInfo(t).tip || ''; }
   const GIM_ICON = {
@@ -147,7 +166,7 @@
     laser: '🔦', saw: '⚙', crusher: '🗜', tokens: '⭐', spinner: '💫', glass: '🪟', flood: '🌊', decoy: '🚩', geyser: '⛲', phase: '👁',
     toggle: '🔀', ring: '⭕', skim: '🪨', cushion: '☁', tornado: '🌪', catapult: '🏹', mine: '💣', liftcup: '🛗', blinkcup: '✨',
   };
-  const gimIcon = (t) => GIM_ICON[t] || '✦';
+  const gimIcon = (t) => (t === 'basics' ? '⛳' : GIM_ICON[t] || '✦');
   function gimBadge(t) { return t ? '<span class="gbadge" title="' + esc(gimDesc(t)) + '"><i>' + gimIcon(t) + '</i>' + esc(gimName(t)) + '</span>' : '<span class="gbadge plain">' + ic('flag') + 'Classic golf</span>'; }
   function allGimmicksList() {
     const M = G.Manifest;
@@ -372,10 +391,26 @@
     (items || []).forEach((x) => unlockQ.push(x));
     if (!unlockBusy) nextUnlock();
   }
+  function achToasts(list) {
+    (list || []).forEach((a) => { if (a) unlockQ.push({ ach: a }); });
+    if (!unlockBusy) nextUnlock();
+  }
   function nextUnlock() {
     const x = unlockQ.shift();
     if (!x) { unlockBusy = false; return; }
     unlockBusy = true;
+    if (G.Haptics) G.Haptics.buzz('unlock');
+    if (x.ach) {
+      const el = document.createElement('div');
+      el.className = 'utoast r-legendary atoast';
+      el.innerHTML = '<div class="ut-cv ach-ic">' + esc(x.ach.icon || '🏅') + '</div><div class="ut-b"><div class="ut-k">' + ic('medal') + 'Achievement unlocked</div>' +
+        '<div class="ut-n">' + esc(x.ach.name) + '</div><div class="ut-r">' + esc(x.ach.desc) + '</div></div>';
+      toasts.appendChild(el);
+      if (A()) A().sfx('fanfare');
+      setTimeout(() => el.classList.add('out'), 3000);
+      setTimeout(() => { el.remove(); nextUnlock(); }, 3400);
+      return;
+    }
     const el = document.createElement('div');
     el.className = 'utoast r-' + (x.rarity || 'common');
     el.innerHTML = '<div class="ut-cv">' + cosCanvas(x.cat, x.id, '', 30) + '</div><div class="ut-b"><div class="ut-k">' + ic('sparkle') + 'Unlocked · ' + esc(x.catName || '') + '</div>' +
@@ -396,7 +431,8 @@
         '<div class="hud-mid">' +
           '<div class="hcard h-strokes"><small>Strokes</small><div class="hs-v"><b></b><span class="hs-lim"></span></div></div>' +
           '<div class="hud-chips"><span class="hchip h-total hidden"></span><span class="hchip h-bonus hidden"></span><span class="hchip h-tokens hidden"></span>' +
-          '<span class="hchip h-wind hidden"><span class="warrow">' + ic('arrow') + '</span><span class="wtxt"></span></span></div>' +
+          '<span class="hchip h-wind hidden"><span class="warrow">' + ic('arrow') + '</span><span class="wtxt"></span></span>' +
+          '<span class="hchip h-clock hidden" title="Hole time (round time)">' + ic('clock') + '<b class="ck-h"></b><small class="ck-r"></small></span></div>' +
         '</div>' +
         '<div class="hud-btns">' +
           '<button class="hbtn" data-act="hud-mute" title="Mute (M)" aria-label="Toggle sound"><span class="i-mute">' + ic('sound') + '</span></button>' +
@@ -411,19 +447,23 @@
         '<button class="hbtn lbl" data-act="hud-look" title="Look around (hold L / right-drag)">' + ic('eye') + '<small>Look</small></button>' +
       '</div>' +
       '<div class="hud-br">' +
+        '<button class="hbtn lbl hidden" data-act="hud-showme" title="Show me: watch the bot solve this hole">' + ic('bulb') + '<small class="sm-t">Show me</small></button>' +
         '<button class="hbtn lbl" data-act="hud-restart" title="Restart hole (R)">' + ic('replay') + '<small>Restart</small></button>' +
         '<button class="hbtn lbl mull" data-act="hud-mull" title="Mulligan: take the last shot again">' + ic('undo') + '<small class="mtxt">Mulligan</small><span class="mcount"></span></button>' +
       '</div>' +
-      '<div class="hud-power hidden"><div class="pw-top"><span class="pw-pct"></span><span class="pw-txt"></span></div><div class="pw-bar"><div class="pw-fill"></div></div></div>' +
+      '<div class="hud-power hidden"><div class="pw-top"><span class="pw-pct"></span><span class="pw-txt"></span></div><div class="pw-bar"><div class="pw-fill"></div><i class="pw-last"></i></div>' +
+        '<div class="pw-scale"><span>0</span><span>10</span><span>20</span><span>30</span><span>40%</span><span class="pw-ext">→ drag further for more</span></div><div class="pw-prev"></div></div>' +
+      '<div class="hud-coach hidden"></div>' +
       '<div class="hud-hint hidden">' + ic('target') + 'Drag back anywhere to aim · release to shoot</div>' +
       '<div class="hud-skip hidden">Tap to skip</div>';
-    ['h-kicker', 'h-par', 'h-name', 'h-mode', 'h-strokes', 'h-total', 'h-bonus', 'h-tokens', 'spinsel', 'sp-lbl', 'h-wind', 'warrow', 'wtxt', 'hud-power', 'pw-fill', 'pw-txt', 'pw-pct', 'mtxt', 'mcount', 'hud-hint', 'hud-skip', 'i-mute'].forEach((c) => { hudEls[c] = hud.querySelector('.' + c); });
+    ['h-kicker', 'h-par', 'h-name', 'h-mode', 'h-strokes', 'h-total', 'h-bonus', 'h-tokens', 'spinsel', 'sp-lbl', 'h-wind', 'warrow', 'wtxt', 'hud-power', 'pw-fill', 'pw-txt', 'pw-pct', 'mtxt', 'mcount', 'hud-hint', 'hud-skip', 'i-mute', 'h-clock', 'ck-h', 'ck-r', 'pw-last', 'pw-prev', 'pw-scale', 'hud-coach', 'sm-t'].forEach((c) => { hudEls[c] = hud.querySelector('.' + c); });
     hudEls.sv = hud.querySelector('.hs-v b'); hudEls.slim = hud.querySelector('.hs-lim');
     hudEls.spinBtns = hud.querySelectorAll('[data-act="hud-spin"]');
     hudEls.spinDots = hud.querySelectorAll('.sp-dots i');
     hudEls.mull = hud.querySelector('[data-act="hud-mull"]');
     hudEls.restart = hud.querySelector('[data-act="hud-restart"]');
     hudEls.look = hud.querySelector('[data-act="hud-look"]');
+    hudEls.showme = hud.querySelector('[data-act="hud-showme"]');
     acts0 = {
       'hud-pause': () => App().pause(),
       'hud-mute': () => App().toggleMute(),
@@ -431,6 +471,11 @@
       'hud-look': () => App().toggleLook(),
       'hud-mull': () => { const s = App().session; if (s && s.mulligan()) toast('Mulligan!', 'info'); },
       'hud-restart': () => App().restartHole(),
+      'hud-showme': () => { const v = App().showMe(); if (v) toast('Watch the ghost — that\'s one way to do it', 'info', 1600); },
+      'coach-min': () => { coachMin = !coachMin; renderCoach(); },
+      'coach-show': () => { const v = App().showMe(); if (v) { coachMin = true; renderCoach(); } },
+      'coach-restart': () => App().restartHole(),
+      'coach-step': (d) => { if (!coach) return; coach.step = Math.max(0, Math.min(BASICS_STEPS.length - 1, (coach.step || 0) + (+d.d))); renderCoach(); },
     };
   }
   let acts0 = {};
@@ -441,6 +486,46 @@
     if (fn) { e.preventDefault(); e.stopPropagation(); click(); fn(el.dataset, el); el.blur(); }
   }
   function showHud(v) { hud.classList.toggle('hidden', !v); hudKey = ''; }
+  // ---- coach card (tutorial) ----
+  let coach = null, coachMin = false;
+  function setCoach(o) { coach = o; coachMin = false; if (o) { o.step = 0; o.seen = 0; } renderCoach(); }
+  // basics: advance the walkthrough with what the player is doing
+  function coachAdvance(info) {
+    if (!coach || coach.type !== 'basics') return;
+    let st = coach.step;
+    if (info.strokes > coach.seen && info.canShoot) { coach.seen = info.strokes; st = Math.max(st, Math.min(2, st + 1)); }
+    if (info.putt && info.canShoot && st < 3) st = 3;
+    if (st !== coach.step) { coach.step = st; coachMin = false; renderCoach(); }
+  }
+  function renderCoach() {
+    const el = hudEls['hud-coach']; if (!el) return;
+    if (!coach || coach.kind !== 'tutorial') { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    const t = coach.type, info = gimInfo(t);
+    el.classList.remove('hidden'); el.classList.toggle('min', coachMin);
+    if (coachMin) {
+      el.innerHTML = '<button class="coach-chip" data-act="coach-min" aria-label="Show tutorial tips"><span class="gi">' + gimIcon(t) + '</span><b>' + esc(info.name || gimName(t)) + '</b>' + ic('bulb') + '</button>';
+      return;
+    }
+    if (t === 'basics') {
+      const k = coach.step || 0, stp = BASICS_STEPS[k];
+      el.innerHTML = '<div class="coach-card basics"><div class="cc-k">' + ic('grad') + 'Basics · ' + (k + 1) + '/' + BASICS_STEPS.length + '</div><button class="coach-x" data-act="coach-min" aria-label="Minimise">' + ic('x') + '</button>' +
+        '<div class="coach-h"><span class="gi">⛳</span><b>' + esc(stp[0]) + '</b></div><div class="coach-d">' + stp[1] + '</div>' +
+        '<div class="coach-dots">' + BASICS_STEPS.map((x, i) => '<i class="' + (i === k ? 'on' : i < k ? 'done' : '') + '"></i>').join('') + '</div>' +
+        '<div class="coach-b">' + (k > 0 ? '<button class="btn sm ghost" data-act="coach-step" data-d="-1">' + ic('back') + 'Back</button>' : '') +
+        (k < BASICS_STEPS.length - 1 ? '<button class="btn sm" data-act="coach-step" data-d="1">Next' + ic('next') + '</button>' : '') +
+        (coach.hint ? '<button class="btn sm ghost" data-act="coach-show">' + ic('bulb') + 'Show me</button>' : '') + '<button class="btn sm ghost" data-act="coach-min">Got it</button></div></div>';
+      el.querySelectorAll('.pp-note').forEach((x) => { if (G.Store.getSettings().precisionPutt === false) x.remove(); });
+      return;
+    }
+    el.innerHTML = '<div class="coach-card"><div class="cc-k">' + ic('grad') + 'Tutorial</div><button class="coach-x" data-act="coach-min" aria-label="Minimise">' + ic('x') + '</button>' +
+      '<div class="coach-h"><span class="gi">' + gimIcon(t) + '</span><b>' + esc(info.name || gimName(t)) + '</b></div>' +
+      (info.desc ? '<div class="coach-d">' + esc(info.desc) + '</div>' : '') + (info.tip ? '<div class="coach-t"><b>Tip</b> ' + esc(info.tip) + '</div>' : '') +
+      '<div class="coach-b">' + (coach.hint ? '<button class="btn sm" data-act="coach-show">' + ic('bulb') + 'Show me</button>' : '') +
+      '<button class="btn sm ghost" data-act="coach-restart">' + ic('replay') + 'Restart</button><button class="btn sm ghost" data-act="coach-min">Got it</button></div>' +
+      '<div class="coach-n">Unlimited strokes — hole it to complete the tutorial.</div></div>';
+  }
+  const fmtTime = (sec) => { sec = Math.max(0, +sec || 0); const m = Math.floor(sec / 60), s2 = sec - m * 60; return m + ':' + (s2 < 10 ? '0' : '') + s2.toFixed(sec < 600 ? 1 : 0); };
+  const fmtTimeS = (sec) => { sec = Math.max(0, Math.round(+sec || 0)); const m = Math.floor(sec / 60), s2 = sec % 60; return m + ':' + (s2 < 10 ? '0' : '') + s2; };
   let hintShown = 0;
   function updateHud(info, extra) {
     if (!info) return;
@@ -492,7 +577,32 @@
       let deg = Math.round(-a.angle * 180 / Math.PI); deg = ((deg % 360) + 360) % 360;
       hudEls['pw-pct'].textContent = Math.round(a.power * 100) + '%';
       hudEls['pw-txt'].textContent = deg + '°' + (info.putt ? ' · putt' : info.spin ? ' · ' + (Math.abs(info.spin) === 1 ? '' : '½ ') + (info.spin < 0 ? 'backspin' : 'topspin') : '');
+      // precision putting: the bar shows the fine 0-40% zone
+      const pz = G.Play && G.Play.PUTT_ZONE || 0.4, prec = !!info.precise;
+      hudEls['hud-power'].classList.toggle('precise', prec);
+      if (prec) hudEls['pw-fill'].style.width = Math.round(Math.min(1, a.power / pz) * 100) + '%';
+      hudEls['hud-power'].classList.toggle('over', prec && a.power > pz + 1e-6);
+      // previous shot marker + readout
+      const L = info.last;
+      if (L) {
+        let ld = Math.round(-L.angle * 180 / Math.PI); ld = ((ld % 360) + 360) % 360;
+        const lp = prec ? Math.min(1, L.power / pz) : L.power;
+        hudEls['pw-last'].style.left = (lp * 100).toFixed(1) + '%'; hudEls['pw-last'].style.display = '';
+        hudEls['pw-prev'].textContent = 'Last shot: ' + ld + '° · ' + Math.round(L.power * 100) + '%' + (L.spin ? ' · ' + (L.spin < 0 ? 'back' : 'top') + 'spin' : '');
+      } else { hudEls['pw-last'].style.display = 'none'; hudEls['pw-prev'].textContent = ''; }
     } else hudEls['hud-power'].classList.add('hidden');
+    // clock
+    const ck = extra.clock;
+    if (ck && (ck.hole > 0 || ck.round)) {
+      hudEls['h-clock'].classList.remove('hidden');
+      hudEls['ck-h'].textContent = fmtTime(ck.hole);
+      hudEls['ck-r'].textContent = ck.round ? fmtTimeS(ck.round) : '';
+    } else hudEls['h-clock'].classList.add('hidden');
+    hudEls.showme.classList.toggle('hidden', !extra.showMe);
+    hudEls.showme.classList.toggle('on', !!info.showMe);
+    hudEls['sm-t'].textContent = info.showMe ? 'Hide' : 'Show me';
+    if (coach && coach.type === 'basics') coachAdvance(info);
+    else if (coach && coach.kind === 'tutorial' && !coachMin && info.strokes > 0) { coachMin = true; renderCoach(); }
     const showHint = info.canShoot && !a && info.strokes === 0 && hintShown < 3;
     hudEls['hud-hint'].classList.toggle('hidden', !showHint);
     hudEls['hud-skip'].classList.toggle('hidden', !info.intro);
@@ -510,6 +620,185 @@
     return list.find((c) => Pg.unlocked(c) && Pg.baked(c.id) && !Pg.courseInfo(c.id).cleared) || null;
   }
 
+  function streakTxt() { const s2 = G.Progress.dailyStreak ? G.Progress.dailyStreak() : { cur: 0 }; return s2.cur > 1 ? s2.cur + '-day streak' : 'New course daily'; }
+  function tutTxt() { return G.Progress.hasTutorials() ? G.Progress.tutorialsDoneCount() + '/' + G.Progress.tutorialTotal() + ' done' : 'Coming soon'; }
+  function achTxt() { const Ac = G.Achievements; return Ac ? Ac.count() + '/' + Ac.total() + ' earned' : ''; }
+
+  SCREENS.notice = function () {
+    render('<div class="center-col"><div class="card pop"><div class="card-k">' + ic('sparkle') + 'Welcome back</div>' +
+      '<h2 class="ttl">The tour has been reshuffled</h2>' +
+      '<div class="sub">The 60 courses now come in a new order, each teaching one gimmick. Your course progress has been reset so the unlocks make sense — ' +
+      'your <b>settings, cosmetics, stats and achievements are all kept</b>.</div>' +
+      '<div class="sub">New: tutorials for every gimmick, Practice mode, Remix rounds, achievements, a daily streak and a share card.</div>' +
+      '<div class="menu"><button class="btn big primary" data-act="ok">' + ic('play') + 'Let\'s play</button></div></div></div>', 'dim');
+    on({ ok: () => { click(); show('title'); }, back: () => show('title') });
+  };
+
+  // ----- achievements -----
+  SCREENS.achievements = function (args) {
+    const Ac = G.Achievements;
+    if (!Ac) { show('title'); return; }
+    const list = Ac.state();
+    const got = list.filter((x) => x.earned).length;
+    let html = topbar('Achievements', got + '/' + list.length + ' earned') + '<div class="page">';
+    html += '<div class="prog-strip"><div class="ps-bar"><i style="width:' + (got / list.length * 100).toFixed(1) + '%"></i></div><span>' + Math.round(got / list.length * 100) + '% complete</span></div>';
+    html += '<div class="ach-grid">' + list.map((x, i) => {
+      const a = x.a, p = x.prog;
+      return '<div class="ach' + (x.earned ? ' got' : '') + '" style="--d:' + Math.min(0.4, i * 0.012) + 's"><div class="ach-ic">' + esc(a.icon) + (x.earned ? '<span class="ach-ok">' + ic('check') + '</span>' : '') + '</div>' +
+        '<div class="ach-b"><b>' + esc(a.name) + '</b><small>' + esc(a.desc) + '</small>' +
+        (x.earned ? '<span class="ach-d">' + ic('check') + 'Earned ' + esc(x.earned) + '</span>'
+          : p ? '<span class="ach-p"><span class="bar"><i style="width:' + Math.round(p.frac * 100) + '%"></i></span><small>' + p.cur + '/' + p.need + '</small></span>' : '<span class="ach-d dim">' + ic('lock') + 'Not yet</span>') +
+        '</div></div>';
+    }).join('') + '</div></div>';
+    render(html, 'list');
+    on({ back: () => show(args.ret || 'title', args.retArgs) });
+  };
+
+  // ----- tutorials -----
+  function tutorialGroups() {
+    const packs = ((G.Manifest && G.Manifest.PACKS) || []).filter((p) => p && Array.isArray(p.gimmicks));
+    const seen = new Set(); const out = packs.map((p) => { p.gimmicks.forEach((g) => seen.add(g)); return { name: p.name || p.id, gimmicks: p.gimmicks.slice() }; });
+    const rest = allGimmicksList().filter((g) => !seen.has(g));
+    if (rest.length) out.push({ name: 'Other', gimmicks: rest });
+    return out;
+  }
+  SCREENS.tutorials = function (args) {
+    const Pg = G.Progress, n = Pg.tutorialTotal(), done = Pg.tutorialsDoneCount();
+    let html = topbar('Tutorials', Pg.hasTutorials() ? done + '/' + n + ' completed' : 'Coming soon', { right: iconBtn('practice', 'target', 'Practice') }) + '<div class="page">';
+    if (!Pg.hasTutorials()) html += '<div class="panel hero-panel"><div class="hp-ic">' + ic('grad') + '</div><h2>Tutorials coming soon</h2><p class="sub">A short teaching hole for every gimmick is on its way. Completing a tutorial unlocks that gimmick in Endless.</p></div>';
+    else html += '<div class="note">' + ic('bulb') + 'A short hole for each gimmick, with unlimited strokes and a “Show me” hint. Completing one unlocks that gimmick in Endless.</div>';
+    if (Pg.tutorialHole('basics')) {
+      const dn = Pg.tutorialDone('basics');
+      html += '<button class="panel basics-card' + (dn ? ' done' : '') + '" data-act="tut" data-t="basics"><span class="big-gi">⛳</span><span class="bc-b"><b>Golf basics</b><small>Start here: aiming, power, spin, putting and the swish.</small></span>' +
+        (dn ? '<span class="tut-ok" aria-label="Completed">' + ic('check') + '</span>' : ic('next')) + '</button>';
+    }
+    tutorialGroups().forEach((g) => {
+      const nd = g.gimmicks.filter((t) => Pg.tutorialDone(t)).length;
+      html += section(esc(g.name) + ' <small>' + nd + '/' + g.gimmicks.length + '</small>', '<div class="tut-grid">' + g.gimmicks.map((t) => {
+        const has = !!Pg.tutorialHole(t), dn = Pg.tutorialDone(t);
+        return '<button class="tut' + (dn ? ' done' : '') + (has ? '' : ' na') + '" data-act="tut" data-t="' + esc(t) + '" title="' + esc(gimDesc(t)) + '"><span class="gi">' + gimIcon(t) + '</span><span class="tut-n">' + esc(gimName(t)) + '</span>' +
+          (dn ? '<span class="tut-ok" aria-label="Completed">' + ic('check') + '</span>' : '') + '</button>';
+      }).join('') + '</div>');
+    });
+    html += '</div>';
+    render(html, 'list');
+    keepScroll(args);
+    on({
+      back: () => show(args.ret || 'title', args.retArgs),
+      practice: () => { click(); show('practice'); },
+      tut: (d) => { if (!G.Progress.tutorialHole(d.t)) { toast(G.Progress.hasTutorials() ? 'No tutorial for this gimmick yet' : 'Tutorials coming soon', 'info'); return; } click(); App().startTutorial(d.t, { ret: { screen: 'tutorials', args: Object.assign({}, args, { scroll: scr().scrollTop }) } }); },
+    });
+  };
+  // offered once before a course's first round
+  function offered(t) { return (G.Store.get('tutOffered', []) || []).indexOf(t) >= 0; }
+  function offerMark(t) { const o = G.Store.get('tutOffered', []) || []; if (o.indexOf(t) < 0) { o.push(t); G.Store.set('tutOffered', o); } }
+  SCREENS.tutOffer = function (args) {
+    const t = args.type, info = gimInfo(t);
+    render('<div class="center-col"><div class="card pop"><div class="card-k">' + ic('grad') + 'New gimmick</div>' +
+      '<div class="ic-ic big-gi">' + gimIcon(t) + '</div><h2 class="ttl">' + esc(info.name || gimName(t)) + '</h2>' +
+      (info.desc && t !== 'basics' ? '<div class="sub">' + esc(info.desc) + '</div>' : '') +
+      '<div class="sub">' + (t === 'basics' ? 'New to Stick Golf? Play a quick practice hole that walks you through the controls. Unlimited strokes.' : 'Try a quick tutorial hole first? Unlimited strokes, and it unlocks this gimmick in Endless.') + '</div>' +
+      '<div class="menu"><button class="btn big primary" data-act="tut">' + ic('grad') + 'Play the tutorial</button>' +
+      '<button class="btn big ghost" data-act="skip">' + (args.first ? 'Skip for now' : 'Skip — start the round') + ic('next') + '</button></div></div></div>', 'dim');
+    on({
+      tut: () => { click(); App().startTutorial(t, args.first ? { ret: { screen: 'title' }, then: { id: 'c01', round: 'all' } } : { ret: { screen: 'course', args: { id: args.id, round: args.round } }, then: { id: args.id, round: args.round, remix: args.remix } }); },
+      skip: () => { click(); if (args.first) show('title'); else if (args.remix) App().startRemix(args.id, args.round); else App().startCourse(args.id, args.start || 0, args.round); },
+      back: () => (args.first ? show('title') : show('course', { id: args.id })),
+    });
+  };
+  SCREENS.tutorialDone = function (args) {
+    const run = App().run, t = run && run.tutorial, info = gimInfo(t), o = (run && run.opts) || {};
+    const next = (() => { const all = allGimmicksList(), i = all.indexOf(t); for (let k = 1; k <= all.length; k++) { const g = all[(i + k) % all.length]; if (G.Progress.tutorialHole(g) && !G.Progress.tutorialDone(g)) return g; } return null; })();
+    render('<div class="center-col"><div class="card pop"><div class="card-k">' + ic('grad') + 'Tutorial</div>' +
+      '<div class="hd-label birdie">Tutorial complete!</div>' +
+      '<div class="ic-ic big-gi">' + gimIcon(t) + '</div><h2 class="ttl">' + esc(info.name || gimName(t)) + '</h2>' +
+      scoreTiles([['Strokes', args.res.strokes], ['Par', args.res.par], ['Time', fmtTime(args.time)]]) +
+      '<div class="badges">' + (t === 'basics' ? '<span class="badge">' + ic('check') + 'Controls mastered — course 1 awaits</span>' : args.first ? '<span class="badge">' + ic('infinity') + 'Now unlocked in Endless</span>' : '<span class="badge">' + ic('check') + 'Already completed</span>') + '</div>' +
+      '<div class="menu">' + (o.then ? '<button class="btn big primary" data-act="then">' + ic('play') + 'Start the round</button>' : '') +
+      (next && !o.then ? '<button class="btn big primary" data-act="next">Next tutorial: ' + esc(gimName(next)) + ic('next') + '</button>' : '') +
+      '<div class="menu-2"><button class="btn" data-act="again">' + ic('replay') + 'Play again</button><button class="btn ghost" data-act="done">' + ic('back') + 'Back</button></div></div></div></div>', 'dim');
+    on({
+      then: () => { click(); const th = o.then; G.UI.setCoach(null); if (th.remix) App().startRemix(th.id, th.round); else App().startCourse(th.id, 0, th.round); },
+      next: () => { click(); App().startTutorial(next, o); },
+      again: () => { click(); App().replayRun(); },
+      done: () => { click(); App().quitToMenu(); }, back: () => App().quitToMenu(),
+    });
+  };
+
+  // ----- practice -----
+  SCREENS.practice = function (args) {
+    const Pg = G.Progress, list = Pg.courses().filter((c) => Pg.unlocked(c) && Pg.baked(c.id));
+    let html = topbar('Practice', 'Play any hole — nothing is recorded', { right: iconBtn('tuts', 'grad', 'Tutorials') }) + '<div class="page">';
+    html += '<div class="note">' + ic('target') + 'Unlimited strokes and restarts, plus a “Show me” ghost of the bot\'s solution. Practice holes count toward the Range Rat achievement only.</div>';
+    html += '<div class="panel prac-tut" role="button" tabindex="0" data-act="tuts"><span class="tile-ic">' + ic('grad') + '</span><div><b>Gimmick tutorials</b><small>' + esc(tutTxt()) + '</small></div>' + ic('next') + '</div>';
+    if (!list.length) html += '<div class="empty small">No courses unlocked yet.</div>';
+    html += '<div class="cgrid">' + list.map((c, k) => '<div class="ccard" role="button" tabindex="0" data-act="pc" data-id="' + esc(c.id) + '" style="--d:' + Math.min(0.4, k * 0.015) + 's"><div class="cc-art">' + swatch(c) + '<span class="cc-num">' + Pg.courseNumber(c) + '</span></div>' +
+      '<div class="cc-body"><div class="cc-name">' + esc(c.name) + '</div><div class="cc-gim">' + gimBadge(courseGim(c)) + '</div></div></div>').join('') + '</div></div>';
+    render(html, 'list');
+    keepScroll(args);
+    on({ back: () => show(args.ret || 'title'), tuts: () => { click(); show('tutorials', { ret: 'practice' }); }, pc: (d) => { click(); show('practiceCourse', { id: d.id }); } });
+  };
+  SCREENS.practiceCourse = function (args) {
+    const Pg = G.Progress, c = Pg.def(args.id);
+    if (!c) { show('practice'); return; }
+    const pars = Pg.pars(c.id) || [], names = (G.BAKED && G.BAKED[c.id] && G.BAKED[c.id].names) || [];
+    const N = Pg.holeCount(c.id);
+    let html = topbar('#' + Pg.courseNumber(c) + ' ' + c.name, 'Practice · pick a hole') + '<div class="page">';
+    if (courseGim(c) && Pg.tutorialHole(courseGim(c))) html += '<button class="btn" data-act="tut">' + ic('grad') + 'Tutorial: ' + esc(gimName(courseGim(c))) + (Pg.tutorialDone(courseGim(c)) ? ' ' + ic('check') : '') + '</button>';
+    html += '<div class="hole-grid">';
+    for (let i = 0; i < N; i++) {
+      const r = Pg.holeRec(c.id, i);
+      html += '<button class="hg" data-act="hole" data-i="' + i + '"><canvas class="hg-cv" data-i="' + i + '"></canvas><span class="hg-b"><b>' + (i + 1) + '</b><span class="hg-n">' + esc(names[i] || 'Hole ' + (i + 1)) + '</span><small>Par ' + (pars[i] || '?') + (r ? ' · best ' + r.b : '') + '</small></span></button>';
+    }
+    html += '</div></div>';
+    render(html, 'list');
+    keepScroll(args);
+    const sc = scr();
+    // thumbnails once the course data is loaded
+    Pg.loadCourse(c.id, (holes) => {
+      if (!holes || !sc.isConnected || !G.Render || !G.Render.drawPreview) return;
+      const theme = G.Run.themeFor(holes[0], c);
+      const cvs = [...sc.querySelectorAll('canvas.hg-cv')];
+      let k = 0;
+      const step = () => { // a few per frame to keep the UI responsive
+        const t0 = performance.now();
+        while (k < cvs.length && performance.now() - t0 < 12) {
+          const cv = cvs[k++], h = holes[+cv.dataset.i]; if (!h) continue;
+          const w = cv.clientWidth || 160, hh = cv.clientHeight || 90, d = DPR();
+          cv.width = Math.round(w * d); cv.height = Math.round(hh * d);
+          const ctx = cv.getContext('2d'); ctx.setTransform(d, 0, 0, d, 0, 0);
+          try { G.Render.drawPreview(ctx, h, G.Run.themeFor(h, theme), w, hh); } catch (e) { /* preview optional */ }
+        }
+        if (k < cvs.length && sc.isConnected) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    on({
+      back: () => show('practice'),
+      tut: () => { click(); App().startTutorial(courseGim(c), { ret: { screen: 'practiceCourse', args: { id: c.id } } }); },
+      hole: (d) => { click(); App().startPractice(c.id, +d.i); },
+    });
+  };
+  SCREENS.practiceDone = function (args) {
+    const run = App().run, r = args.res;
+    const lbl = G.Modes.scoreLabel(args.score, r.par);
+    const N = run.courseHoles || 18, i = run.offset || 0;
+    render('<div class="center-col"><div class="card pop"><div class="card-k">' + ic('target') + 'Practice · ' + esc(args.name || '') + '</div>' +
+      '<div class="hd-label ' + lbl.cls + '">' + esc(lbl.text) + '</div>' +
+      scoreTiles([['Strokes', r.strokes], ['Par', r.par], ['Time', fmtTime(args.time)]]) +
+      '<div class="note">' + ic('check') + 'Practice — nothing recorded except your practice count (' + (G.Store.getStats().practice || 0) + ').</div>' +
+      '<div class="menu"><button class="btn big primary" data-act="again">' + ic('replay') + 'Again</button>' +
+      '<div class="menu-2">' + (i > 0 ? '<button class="btn" data-act="prev">' + ic('back') + 'Hole ' + i + '</button>' : '') +
+      (i < N - 1 ? '<button class="btn" data-act="next">Hole ' + (i + 2) + ic('next') + '</button>' : '') +
+      '<button class="btn ghost" data-act="list">' + ic('grid') + 'Holes</button></div></div></div></div>', 'dim');
+    on({
+      again: () => { click(); App().startPractice(run.courseId, i); },
+      prev: () => { click(); App().startPractice(run.courseId, i - 1); },
+      next: () => { click(); App().startPractice(run.courseId, i + 1); },
+      list: () => { click(); App().quitToMenu(); }, back: () => App().quitToMenu(),
+    });
+  };
+
   SCREENS.title = function () {
     const Pg = G.Progress;
     const nc = nextCourse(), nNew = Pg.newCount ? Pg.newCount() : 0;
@@ -522,9 +811,11 @@
           '<button class="tile hero" style="--d:.1s" data-act="go" data-to="courses"><span class="tile-ic">' + ic('play') + '</span><span class="hero-b"><span class="tile-l">Play courses</span>' +
             '<span class="tile-s">' + (nc ? 'Up next: #' + Pg.courseNumber(nc) + ' ' + esc(nc.name) : cleared + ' courses cleared') + '</span></span><span class="hero-go">' + ic('next') + '</span></button>' +
           '<div class="tgrid">' +
-            tile('endless', 'infinity', 'Endless', 'Survival run', 0) + tile('daily', 'calendar', 'Daily', 'New course daily', 1) +
-            tile('random', 'dice', 'Random', 'Shareable seeds', 2) + tile('locker', 'shirt', 'Locker', 'Cosmetics', 3, nNew ? nNew : '') +
-            tile('stats', 'chart', 'Stats', 'Lifetime records', 4) + tile('settings', 'settings', 'Settings', 'Sound & difficulty', 5) +
+            tile('endless', 'infinity', 'Endless', 'Survival run', 0) + tile('daily', 'calendar', 'Daily', streakTxt(), 1) +
+            tile('random', 'dice', 'Random', 'Shareable seeds', 2) + tile('practice', 'target', 'Practice', 'Any hole, any time', 3) +
+            tile('tutorials', 'grad', 'Tutorials', tutTxt(), 4) + tile('achievements', 'medal', 'Achievements', achTxt(), 5) +
+            tile('locker', 'shirt', 'Locker', 'Cosmetics', 6, nNew ? nNew : '') +
+            tile('stats', 'chart', 'Stats', 'Lifetime records', 7) + tile('settings', 'settings', 'Settings', 'Sound, feel & access', 8) +
           '</div>' +
         '</div>' +
         '<div class="title-foot">' + starPill() + diffChip() +
@@ -549,7 +840,11 @@
         '<div class="diff-grid">' + G.Modes.ORDER.map((id, i) => { const d = G.Modes.DIFFS[id]; return '<button class="dcard pop ' + id + (cur === id ? ' sel' : '') + '" style="animation-delay:' + (i * 0.06) + 's" data-act="pick" data-id="' + id + '"><span class="dic">' + diffIc(id) + '</span><span class="dn">' + d.name + '</span><span class="dd">' + esc(d.desc) + '</span>' + (cur === id ? '<span class="dsel">' + ic('check') + '</span>' : '') + '</button>'; }).join('') + '</div>' +
       '</div>', 'diff');
     on({
-      pick: (d) => { click(); G.Store.saveSettings({ difficulty: d.id }); toast('Difficulty: ' + G.Modes.get(d.id).name, 'info'); show(args.ret || 'title', args.retArgs); },
+      pick: (d) => {
+        click(); G.Store.saveSettings({ difficulty: d.id }); toast('Difficulty: ' + G.Modes.get(d.id).name, 'info');
+        if (args.first && G.Progress.tutorialHole('basics') && !G.Progress.tutorialDone('basics')) { offerMark('basics'); show('tutOffer', { type: 'basics', first: true }); return; }
+        show(args.ret || 'title', args.retArgs);
+      },
       back: () => { show(args.ret || 'title', args.retArgs); },
       settings: () => {},
     });
@@ -566,6 +861,13 @@
     if (!anyBaked) html += '<div class="empty small">No courses baked yet. Try Endless, Daily or Random.</div>';
     let nextId = null;
     html += '<div class="cgrid">';
+    if (Pg.tutorialHole('basics')) {
+      const dn = Pg.tutorialDone('basics');
+      html += '<div class="ccard basics-cc' + (dn ? ' done' : ' next') + '" role="button" tabindex="0" data-act="basics" id="cc-basics"><div class="cc-art basics-art"><span class="big-gi">⛳</span>' +
+        (dn ? '<span class="cc-done" title="Completed">' + ic('check') + '</span>' : '<span class="cc-next">Start here</span>') + '</div>' +
+        '<div class="cc-body"><div class="cc-name">Basics tutorial</div><div class="cc-gim"><span class="gbadge plain">' + ic('grad') + 'Learn the controls</span></div>' +
+        '<div class="cc-foot"><span class="dim">1 hole · unlimited strokes</span></div></div></div>';
+    }
     list.forEach((c, k) => {
       const info = Pg.courseInfo(c.id), unl = Pg.unlocked(c), bk = Pg.baked(c.id), gt = courseGim(c);
       if (!nextId && unl && bk && !info.cleared) nextId = c.id;
@@ -592,6 +894,7 @@
     if (target) { const el = root.querySelector('.screen:not(.leaving) #cc-' + CSS.escape(target)); if (el) { const s = scr(); const top = el.offsetTop - s.clientHeight / 2 + el.offsetHeight / 2; if (top > 60) s.scrollTop = top; } }
     on({
       back: () => show('title'),
+      basics: () => { click(); App().startTutorial('basics', { ret: { screen: 'courses', args: { focus: 'basics' } } }); },
       course: (d) => {
         const c = G.Progress.def(d.id);
         if (!G.Progress.unlocked(c)) { A().sfx('uiback'); toast('Locked: ' + G.Progress.unlockText(c), 'warn'); return; }
@@ -638,7 +941,11 @@
     const Pg = G.Progress, c = Pg.def(args.id);
     if (!c) { show('courses'); return; }
     const info = Pg.courseInfo(c.id), pars = Pg.pars(c.id), gt = courseGim(c), num = Pg.courseNumber(c);
-    const N = info.holes, rounds = Pg.roundsFor(c.id), br = info.bestRound || {};
+    const N = info.holes, rounds = Pg.roundsFor(c.id);
+    const canRemix = !!(G.Generator && G.Generator.mirrorHole), remixOk = canRemix && Pg.remixAvailable(c.id);
+    const remix = !!args.remix && remixOk;
+    const br = remix ? Pg.remixBests(c.id) : (info.bestRound || {}), bt = Pg.bestTimes(c.id);
+    const hasTut = !!(gt && Pg.tutorialHole(gt)), tutDone = gt && Pg.tutorialDone(gt);
     let round = args.round || G.Store.get('roundChoice', 'all');
     if (rounds.indexOf(round) < 0) round = rounds[0];
     const rng = Pg.roundRange(c.id, round) || [0, N];
@@ -650,20 +957,27 @@
       '<div class="cd-num">Course ' + num + ' of ' + Pg.courses().length + '</div><h2>' + esc(c.name || c.id) + '</h2>' +
       (c.concept ? '<p class="cd-concept">' + esc(c.concept) + '</p>' : '') +
       (gt ? '<div class="cd-gim"><div class="cd-gn"><span class="gi">' + gimIcon(gt) + '</span><b>' + esc(gimName(gt)) + '</b><span class="tag">New gimmick</span></div>' +
-        (gimDesc(gt) ? '<div>' + esc(gimDesc(gt)) + '</div>' : '') + (gimTip(gt) ? '<div class="cd-tip"><b>Tip</b> ' + esc(gimTip(gt)) + '</div>' : '') + '</div>'
-        : '<div class="cd-gim"><div>Just you, the ball and the cup. Drag back to aim, release to shoot, and use backspin/topspin on full shots.</div></div>') +
+        (gimDesc(gt) ? '<div>' + esc(gimDesc(gt)) + '</div>' : '') + (gimTip(gt) ? '<div class="cd-tip"><b>Tip</b> ' + esc(gimTip(gt)) + '</div>' : '') +
+        '<div class="cd-tut"><button class="btn sm' + (hasTut ? '' : ' disabled') + '" data-act="tut">' + ic('grad') + (hasTut ? 'Tutorial' : 'Tutorial coming soon') + (tutDone ? ' ' + ic('check') : '') + '</button>' +
+        '<span class="dim">' + (tutDone ? 'Done · unlocked in Endless' : 'Unlocks it in Endless') + '</span></div></div>'
+        : '<div class="cd-gim"><div>Just you, the ball and the cup. Drag back to aim, release to shoot, and use backspin/topspin on full shots.</div>' +
+          (Pg.tutorialHole('basics') ? '<div class="cd-tut"><button class="btn sm" data-act="basics">' + ic('grad') + 'Basics tutorial' + (Pg.tutorialDone('basics') ? ' ' + ic('check') : '') + '</button><span class="dim">Learn the controls</span></div>' : '') + '</div>') +
       '<div class="cd-stats"><span>' + ic('star') + '<b>' + info.stars + '</b>/' + info.maxStars + '</span>' + (info.bonus ? '<span>Bonus <b>+' + info.bonus + '</b></span>' : '') +
         '<span>Par <b>' + info.par + '</b>' + (info.back ? ' <small>(' + info.front.par + ' + ' + info.back.par + ')</small>' : '') + '</span>' +
         (info.cleared ? '<span class="ok">' + ic('check') + 'Cleared</span>' : '') + '</div>' +
       '</div></div>';
-    html += '<div class="panel cd-play"><div class="panel-h"><h3>' + ic('flag') + 'Choose a round</h3></div><div class="rounds">' + rounds.map((r) => {
-      const b2 = br[r], rp = roundPar(r);
+    const modeSeg = canRemix ? '<div class="seg mode-seg"><button class="segb ' + (remix ? '' : 'on') + '" data-act="mode" data-v="0">' + ic('flag') + 'Normal</button>' +
+      '<button class="segb ' + (remix ? 'on' : '') + (remixOk ? '' : ' locked') + '" data-act="mode" data-v="1" title="' + (remixOk ? 'Mirrored holes, tee on the right' : 'Clear this course under par to unlock Remix') + '">' + ic(remixOk ? 'mirror' : 'lock') + 'Remix</button></div>' : '';
+    html += '<div class="panel cd-play' + (remix ? ' remix' : '') + '"><div class="panel-h"><h3>' + ic(remix ? 'mirror' : 'flag') + (remix ? 'Remix round' : 'Choose a round') + '</h3>' + modeSeg + '</div>' +
+      (remix ? '<div class="note">' + ic('mirror') + 'Every hole mirrored — the tee is on the right. Separate personal bests.</div>' : '') + '<div class="rounds">' + rounds.map((r) => {
+      const b2 = br[r], rp = roundPar(r), tm = bt[(remix ? 'rx-' : '') + r];
       return '<button class="rbtn ' + (r === round ? 'on' : '') + '" data-act="round" data-r="' + r + '"><span class="rb-n">' + esc(N <= 9 ? '9 holes' : Pg.ROUND_NAMES[r]) + '</span>' +
         '<span class="rb-d">' + (N <= 9 ? 'Par ' + rp : rdesc[r] + ' · Par ' + rp) + '</span><span class="rb-b">' + (b2 !== undefined ? 'Best ' + b2 + ' ' + relTag(b2, rp) : 'Not played') + '</span>' +
+        (tm !== undefined ? '<span class="rb-t">' + ic('clock') + fmtTimeS(tm) + '</span>' : '') +
         (r === round ? '<span class="rb-chk">' + ic('check') + '</span>' : '') + '</button>';
     }).join('') + '</div>' +
-      '<button class="btn primary big" data-act="play" data-i="-1">' + ic('play') + 'Play ' + esc(N <= 9 ? '' : Pg.ROUND_NAMES[round]) + '</button>' +
-      '<div class="note">Holes are played in order. Hit the stroke limit and the hole is picked up.</div></div>';
+      '<button class="btn big primary" data-act="play" data-i="-1">' + ic(remix ? 'mirror' : 'play') + (remix ? 'Play Remix ' : 'Play ') + esc(N <= 9 ? '' : Pg.ROUND_NAMES[round]) + '</button>' +
+      '<div class="note">Holes are played in order. Hit the stroke limit and the hole is picked up.' + (canRemix && !remixOk ? ' Clear the course under par to unlock its Remix.' : '') + '</div></div>';
     html += '</div>';
     html += bestCardHtml(c.id, info, pars, rng);
     if (!Pg.baked(c.id)) html += '<div class="empty small">This course has not been baked yet.</div>';
@@ -672,12 +986,25 @@
     keepScroll(args);
     on({
       back: () => show('courses', { focus: c.id }),
-      round: (d) => { click(); G.Store.set('roundChoice', d.r); show('course', { id: c.id, round: d.r, scroll: scr().scrollTop }); },
+      round: (d) => { click(); G.Store.set('roundChoice', d.r); show('course', { id: c.id, round: d.r, remix, scroll: scr().scrollTop }); },
+      mode: (d) => {
+        if (d.v === '1' && !remixOk) { A().sfx('uiback'); toast('Clear this course under par to unlock its Remix', 'warn'); return; }
+        click(); show('course', { id: c.id, round, remix: d.v === '1', scroll: scr().scrollTop });
+      },
+      tut: () => { if (!hasTut) { toast('Tutorials coming soon', 'info'); return; } click(); App().startTutorial(gt, { ret: { screen: 'course', args: { id: c.id, round, remix } } }); },
+      basics: () => { click(); App().startTutorial('basics', { ret: { screen: 'course', args: { id: c.id, round, remix } } }); },
       // a round is always played in order from its first hole
       play: () => {
         if (!Pg.baked(c.id)) { toast('Course not baked yet', 'warn'); return; }
         click();
-        App().startCourse(c.id, rng[0], round);
+        // offer the gimmick tutorial once, before the course's first round
+        const ot = gt || (num === 1 ? 'basics' : null);
+        if (ot && Pg.tutorialHole(ot) && !Pg.tutorialDone(ot) && info.done === 0 && !offered(ot) && !remix) {
+          offerMark(ot);
+          show('tutOffer', { type: ot, id: c.id, round, start: rng[0], remix });
+          return;
+        }
+        if (remix) App().startRemix(c.id, round); else App().startCourse(c.id, rng[0], round);
       },
     });
   };
@@ -706,15 +1033,17 @@
       (s ? '<h2 class="ttl">' + esc(s.hole.name) + '</h2><div class="kv-row"><span><small>Par</small><b>' + s.hole.par + '</b></span><span><small>Strokes</small><b>' + s.S.strokes + '</b></span>' + (ex ? '<span><small>Mode</small><b>' + esc(ex) + '</b></span>' : '') + '</div>' : '<h2 class="ttl">Paused</h2>') +
       '<div class="menu">' +
       '<button class="btn big primary" data-act="resume">' + ic('play') + 'Resume</button>' +
-      (run && run.kind === 'dev' ? '<button class="btn big" data-act="restart">' + ic('replay') + 'Restart hole</button>' : '') +
+      (run && (run.kind === 'dev' || run.kind === 'practice' || run.kind === 'tutorial') ? '<button class="btn big" data-act="restart">' + ic('replay') + 'Restart hole</button>' : '') +
+      (s && (run.kind === 'practice' || run.kind === 'tutorial') && s.hasBotHint() ? '<button class="btn big" data-act="showme">' + ic('bulb') + (s.botGhost ? 'Hide hint' : 'Show me') + '</button>' : '') +
       (m !== 0 ? '<button class="btn big ' + (s && s.canMulligan() ? '' : 'disabled') + '" data-act="mull">' + ic('undo') + 'Mulligan <small>' + (m === Infinity ? 'unlimited' : m + ' left') + '</small></button>' : '') +
       (run && run.kind !== 'endless' && run.scores.length ? '<button class="btn big" data-act="card">' + ic('card') + 'Scorecard</button>' : '') +
       '<div class="menu-2"><button class="btn" data-act="settings">' + ic('settings') + 'Settings</button>' +
-      '<button class="btn danger" data-act="quit">' + ic('home') + 'Quit round</button></div></div>' +
+      '<button class="btn danger" data-act="quit">' + ic('home') + (run && (run.kind === 'practice' || run.kind === 'tutorial') ? 'Quit' : 'Quit round') + '</button></div></div>' +
       '<div class="keys"><span><kbd>Drag</kbd> aim</span><span><kbd>←→↑↓</kbd><kbd>Space</kbd> shoot</span><span><kbd>B</kbd><kbd>T</kbd> spin</span><span><kbd>L</kbd> look</span><span><kbd>M</kbd> mute</span></div></div></div>', 'pause dim');
     on({
       resume: () => { click(); App().resume(); }, back: () => App().resume(),
       restart: () => { click(); App().resume(); App().restartHole(); },
+      showme: () => { click(); App().resume(); App().showMe(); },
       mull: () => { click(); App().resume(); if (s && s.mulligan()) toast('Mulligan!', 'info'); },
       settings: () => { click(); show('settings', { ret: 'pause' }); },
       card: () => { click(); show('scorecard', { ret: 'pause' }); },
@@ -735,14 +1064,28 @@
       '<div class="note">' + esc(G.Modes.get(cur).desc) + (inPlay ? ' <em>Applies from the next hole.</em>' : '') + '</div>');
     html += section(ic('sound') + 'Audio',
       '<div class="srow"><div class="sl"><b>Sound effects</b><small>' + (st.mute ? 'Muted' : 'On') + ' · M toggles</small></div>' + sw(!st.mute, 'mute') + '</div>' +
-      '<div class="srow"><div class="sl"><b>Volume</b><small class="vol-v">' + Math.round(st.sfxVol * 100) + '%</small></div><input type="range" min="0" max="1" step="0.05" value="' + st.sfxVol + '" data-in="sfx" style="--v:' + (st.sfxVol * 100) + '%"></div>');
-    html += section(ic('eye') + 'Display',
-      '<div class="srow"><div class="sl"><b>Screen shake</b><small>Impacts, cannons, explosions</small></div>' + sw(st.shake !== false, 'shake') + '</div>');
+      '<div class="srow"><div class="sl"><b>Volume</b><small class="vol-v">' + Math.round(st.sfxVol * 100) + '%</small></div><input type="range" min="0" max="1" step="0.05" value="' + st.sfxVol + '" data-in="sfx" style="--v:' + (st.sfxVol * 100) + '%"></div>' +
+      '<div class="srow"><div class="sl"><b>' + ic('music') + ' Ambient music</b><small>Gentle generative pads, varies by course</small></div>' + sw(!!st.bgm, 'bgm') + '</div>' +
+      (st.bgm ? '<div class="srow"><div class="sl"><b>Music volume</b><small class="bgm-v">' + Math.round(st.bgmVol * 100) + '%</small></div><input type="range" min="0" max="1" step="0.05" value="' + st.bgmVol + '" data-in="bgmv" style="--v:' + (st.bgmVol * 100) + '%"></div>' : ''));
+    const rfx = G.Store.reducedFx();
+    html += section(ic('phone') + 'Feel',
+      '<div class="srow"><div class="sl"><b>Haptics</b><small>' + (G.Haptics && G.Haptics.supported ? 'Vibration on shots, bounces, holes and hazards' : 'Not supported on this device') + '</small></div>' + sw(st.haptics !== false && !!(G.Haptics && G.Haptics.supported), 'haptics', G.Haptics && G.Haptics.supported ? '' : ' disabled') + '</div>' +
+      '<div class="srow"><div class="sl"><b>Ghost ball</b><small>Replays your previous shot while you aim</small></div>' + sw(st.ghost !== false, 'ghost') + '</div>' +
+      '<div class="srow"><div class="sl"><b>Screen shake</b><small>' + (rfx ? 'Off while reduced effects is on' : 'Impacts, cannons, explosions') + '</small></div>' + sw(st.shake !== false && !rfx, 'shake', rfx ? ' disabled' : '') + '</div>');
+    const sens = (name, label, v) => '<div class="srow"><div class="sl"><b>' + label + '</b><small class="sv-' + name + '">' + Math.round(v * 100) + '%</small></div><input type="range" min="0.5" max="2" step="0.05" value="' + v + '" data-in="' + name + '" style="--v:' + ((v - 0.5) / 1.5 * 100) + '%"></div>';
+    html += section(ic('target') + 'Aiming',
+      sens('sensTouch', 'Touch drag sensitivity', +st.sensTouch || 1) + sens('sensMouse', 'Mouse drag sensitivity', +st.sensMouse || 1) +
+      '<div class="srow"><div class="sl"><b>Precision putting</b><small>On the green the drag covers 0–40% power (with a scale); drag further for more</small></div>' + sw(st.precisionPutt !== false, 'precise') + '</div>');
+    html += section(ic('access') + 'Accessibility',
+      '<div class="srow"><div class="sl"><b>Colour-blind mode</b><small>Safer colours plus patterns and shapes for hazards and scores</small></div>' + sw(!!st.colorblind, 'cb') + '</div>' +
+      '<div class="srow"><div class="sl"><b>Reduced effects</b><small>No shake, fewer particles and animations' + (st.reducedFx === null || st.reducedFx === undefined ? ' · following your system setting' : '') + '</small></div>' + sw(rfx, 'rfx') + '</div>' +
+      '<div class="srow"><div class="sl"><b>Larger touch targets</b><small>Bigger HUD buttons and controls</small></div>' + sw(!!st.bigTouch, 'bigt') + '</div>' +
+      '<div class="srow"><div class="sl"><b>High-contrast UI</b><small>Solid panels, stronger outlines and text</small></div>' + sw(!!st.highContrast, 'hc') + '</div>');
     html += section(ic('target') + 'Controls', '<div class="ctl-list">' +
-      [['Drag back', 'Aim + power (slingshot); drag to the start to cancel'], ['← → / A D', 'Angle'], ['↑ ↓ / W S', 'Power (Shift = fine)'], ['Space', 'Shoot'], ['B / T / wheel', 'More backspin / topspin (full shots only)'], ['L / right-drag', 'Look around; wheel or pinch zooms'], ['Esc / P', 'Pause'], ['M', 'Mute']]
+      [['Drag back', 'Aim + power (slingshot); drag to the start to cancel'], ['R', 'Restart hole (practice & tutorials)'], ['← → / A D', 'Angle'], ['↑ ↓ / W S', 'Power (Shift = fine)'], ['Space', 'Shoot'], ['B / T / wheel', 'More backspin / topspin (full shots only)'], ['L / right-drag', 'Look around; wheel or pinch zooms'], ['Esc / P', 'Pause'], ['M', 'Mute']]
         .map((r) => '<div class="ctl"><kbd>' + esc(r[0]) + '</kbd><span>' + esc(r[1]) + '</span></div>').join('') + '</div>' +
       '<div class="note">Rounds play straight through: no hole restarts. Hitting the stroke limit picks the hole up and moves on.</div>');
-    html += section(ic('trash') + 'Data', '<div class="srow"><div class="sl"><b>Reset all progress</b><small>Stars, bests, stats and unlocks</small></div><button class="btn danger sm" data-act="reset">Reset</button></div>');
+    html += section(ic('trash') + 'Data', '<div class="srow"><div class="sl"><b>Reset all progress</b><small>Stars, bests, stats, tutorials, achievements and unlocks</small></div><button class="btn danger sm" data-act="reset">Reset</button></div>');
     html += '</div>';
     render(html, 'list');
     keepScroll(args);
@@ -754,6 +1097,17 @@
       diff: (d) => { click(); G.Store.saveSettings({ difficulty: d.id }); re(); },
       mute: () => { App().toggleMute(); re(); },
       shake: () => { click(); G.Store.saveSettings({ shake: st.shake === false }); re(); },
+      bgm: () => { click(); G.Store.saveSettings({ bgm: !st.bgm }); App().applyAudio(); re(); },
+      haptics: () => { click(); G.Store.saveSettings({ haptics: st.haptics === false }); if (st.haptics !== false && G.Haptics) G.Haptics.buzz('shot'); re(); },
+      ghost: () => { click(); G.Store.saveSettings({ ghost: st.ghost === false }); re(); },
+      precise: () => { click(); G.Store.saveSettings({ precisionPutt: st.precisionPutt === false }); re(); },
+      cb: () => { click(); G.Store.saveSettings({ colorblind: !st.colorblind }); App().applyA11y(); re(); },
+      rfx: () => { click(); G.Store.saveSettings({ reducedFx: !G.Store.reducedFx() }); App().applyA11y(); re(); },
+      bigt: () => { click(); G.Store.saveSettings({ bigTouch: !st.bigTouch }); App().applyA11y(); re(); },
+      hc: () => { click(); G.Store.saveSettings({ highContrast: !st.highContrast }); App().applyA11y(); re(); },
+      'in:bgmv': (el) => { G.Store.saveSettings({ bgmVol: +el.value }); el.style.setProperty('--v', (el.value * 100) + '%'); const v = scr().querySelector('.bgm-v'); if (v) v.textContent = Math.round(el.value * 100) + '%'; App().applyAudio(); },
+      'in:sensTouch': (el) => { G.Store.saveSettings({ sensTouch: +el.value }); el.style.setProperty('--v', ((el.value - 0.5) / 1.5 * 100) + '%'); const v = scr().querySelector('.sv-sensTouch'); if (v) v.textContent = Math.round(el.value * 100) + '%'; },
+      'in:sensMouse': (el) => { G.Store.saveSettings({ sensMouse: +el.value }); el.style.setProperty('--v', ((el.value - 0.5) / 1.5 * 100) + '%'); const v = scr().querySelector('.sv-sensMouse'); if (v) v.textContent = Math.round(el.value * 100) + '%'; },
       reset: (d, el) => {
         if (!resetArm) { resetArm = true; el.textContent = 'Tap again to confirm'; el.classList.add('armed'); return; }
         G.Progress.resetAll(); G.Store.del('seenUnlocks'); toast('Progress reset', 'warn'); re();
@@ -787,7 +1141,7 @@
         '<span class="lt-art">' + cosCanvas(tab, it.id, 'lt-cv') + (x.ok ? '' : '<span class="lt-lock">' + ic('lock') + '</span>') + '</span>' +
         '<span class="lt-name">' + esc(it.name || it.id) + '</span>' +
         (x.ok ? '<span class="lt-sub">' + (isEq ? ic('check') + 'Equipped' : RAR_NAME[x.rarity]) + '</span>'
-          : '<span class="lt-prog"><span class="bar"><i style="width:' + Math.round(x.frac * 100) + '%"></i></span><small>' + esc(x.req && x.req.type === 'course' ? 'Course' : x.cur + '/' + x.need) + '</small></span>') +
+          : '<span class="lt-prog"><span class="bar"><i style="width:' + Math.round(x.frac * 100) + '%"></i></span><small>' + esc(x.single ? (x.req.type === 'course' ? 'Course' : 'Achv.') : x.cur + '/' + x.need) + '</small></span>') +
         (x.isNew ? '<span class="lt-new">New</span>' : '') + '</button>';
     }).join('') + '</div></div></div>';
     render(html, 'list locker-screen');
@@ -805,7 +1159,7 @@
         '<div class="lk-info"><div class="lk-cat">' + esc(g.cat.name.replace(/s$/, '')) + '</div><h2>' + esc(it.name || it.id) + '</h2>' +
         (it.desc ? '<p class="lk-desc">' + esc(it.desc) + '</p>' : '') +
         (x.ok ? (isEq ? '<button class="btn big eqd disabled">' + ic('check') + 'Equipped</button>' : '<button class="btn big primary" data-act="equip" data-id="' + esc(it.id) + '">Equip</button>')
-          : '<div class="lk-req">' + ic('lock') + '<div><b>' + esc(x.text) + '</b>' + (x.req && x.req.type !== 'course' ? '<div class="bar big"><i style="width:' + Math.round(x.frac * 100) + '%"></i></div><small>' + esc(x.prog) + '</small>' : '<small>' + esc(x.prog) + '</small>') + '</div></div>') +
+          : '<div class="lk-req">' + ic('lock') + '<div><b>' + esc(x.text) + '</b>' + (!x.single ? '<div class="bar big"><i style="width:' + Math.round(x.frac * 100) + '%"></i></div><small>' + esc(x.prog) + '</small>' : '<small>' + esc(x.prog) + '</small>') + '</div></div>') +
         '</div>';
       const cv = stage.querySelector('canvas'); anims.push({ cv, cat: tab, item: it, fps: 60, last: -1, stage: true }); if (!animRaf) animRaf = requestAnimationFrame(animTick);
       if (x.isNew) { Pg.markSeen(tab, it.id); x.isNew = false; const b = sc.querySelector('.lt[data-id="' + CSS.escape(it.id) + '"] .lt-new'); if (b) b.remove(); }
@@ -871,7 +1225,7 @@
     if (locked.length) {
       html += section(ic('medal') + 'Closest unlocks', '<div class="goals">' + locked.slice(0, 6).map(({ g, x }) =>
         '<button class="goal r-' + x.rarity + '" data-act="goal" data-k="' + g.cat.key + '" data-id="' + esc(x.item.id) + '"><span class="goal-cv">' + cosCanvas(g.cat.key, x.item.id, '', 10) + '</span><span class="goal-b"><b>' + esc(x.item.name || x.item.id) + '</b><small>' + esc(x.text) + '</small>' +
-        '<span class="bar"><i style="width:' + Math.round(x.frac * 100) + '%"></i></span></span><span class="goal-p">' + esc(x.req && x.req.type === 'course' ? '' : x.cur + '/' + x.need) + '</span></button>').join('') + '</div>');
+        '<span class="bar"><i style="width:' + Math.round(x.frac * 100) + '%"></i></span></span><span class="goal-p">' + esc(x.single ? '' : x.cur + '/' + x.need) + '</span></button>').join('') + '</div>');
     }
     html += '</div>';
     render(html, 'list');
@@ -896,7 +1250,7 @@
       '<div class="card-k">' + esc(args.name || '') + '</div>' +
       '<div class="hd-label ' + lbl.cls + '">' + esc(lbl.text) + '</div>' +
       (endless ? '' : '<div class="hd-stars">' + [0, 1, 2].map((i) => '<span class="st big ' + (i < st ? 'on' : '') + '" style="animation-delay:' + (0.25 + i * 0.2) + 's">' + ic('star') + '</span>').join('') + '</div>') +
-      scoreTiles([bonus ? ['Strokes', r.strokes] : null, bonus ? ['Swish', '−' + bonus, 'swb'] : null, [bonus ? 'Score' : 'Strokes', score], ['Par', r.par],
+      scoreTiles([bonus ? ['Strokes', r.strokes] : null, bonus ? ['Swish', '−' + bonus, 'swb'] : null, [bonus ? 'Score' : 'Strokes', score], ['Par', r.par], r.time && !endless ? ['Time', fmtTime(r.time)] : null,
         [endless ? 'Run score' : 'Total', endless ? run.score : relPar(run.totalStrokes(), tp), endless ? '' : 'rel ' + relCls(run.totalStrokes(), tp)]]) +
       '<div class="badges">' + (args.newBest ? '<span class="badge">' + ic('trophy') + 'New best</span>' : '') +
       (r.swish ? '<span class="badge swish">' + ic('swish') + 'Swish — straight in, −' + bonus + '</span>' : '') +
@@ -933,9 +1287,10 @@
   function scorecardHtml(run) {
     const n = Math.min(run.kind === 'course' ? 18 : 9, run.n), off = run.offset || 0;
     const course = run.kind === 'course';
-    let h1 = '<tr><th>Hole</th>', h2 = '<tr class="par-row"><th>Par</th>', h3 = '<tr><th>Score</th>';
-    let tp = 0, ts = 0, np = 0, ns = 0;
-    const sub = (label) => { h1 += '<th class="sum">' + label + '</th>'; h2 += '<td class="sum">' + np + '</td>'; h3 += '<td class="sum"><b>' + ns + '</b></td>'; np = 0; ns = 0; };
+    let h1 = '<tr><th>Hole</th>', h2 = '<tr class="par-row"><th>Par</th>', h3 = '<tr><th>Score</th>', h4 = '<tr class="time-row"><th>' + ic('clock') + '</th>';
+    let tp = 0, ts = 0, np = 0, ns = 0, nt = 0, tt = 0;
+    const timed = (run.times || []).some((x) => x > 0);
+    const sub = (label) => { h1 += '<th class="sum">' + label + '</th>'; h2 += '<td class="sum">' + np + '</td>'; h3 += '<td class="sum"><b>' + ns + '</b></td>'; h4 += '<td class="sum">' + (nt ? fmtTimeS(nt) : '') + '</td>'; np = 0; ns = 0; nt = 0; };
     for (let i = 0; i < n; i++) {
       const hole = run.holes[i], s = run.scores[i], num = off + i + 1;
       const par = s ? s.par : hole ? hole.par : '';
@@ -944,9 +1299,11 @@
       if (s) {
         const sc = s.score !== undefined ? s.score : s.strokes;
         tp += s.par; ts += sc; np += s.par; ns += sc;
-        const cls = s.failed ? 'x' : G.Modes.scoreLabel(sc, s.par).cls;
-        h3 += '<td>' + scv(sc + (s.bonus ? '<sup class="swsup">−' + s.bonus + '</sup>' : ''), cls, s.bonus ? s.strokes + ' strokes, swish −' + s.bonus : s.failed ? 'Picked up' : '') + '</td>';
-      } else h3 += '<td class="none">·</td>';
+        const lb = G.Modes.scoreLabel(sc, s.par), cls = s.failed ? 'x' : lb.cls;
+        h3 += '<td>' + scv(sc + (s.bonus ? '<sup class="swsup">−' + s.bonus + '</sup>' : ''), cls, (s.failed ? 'Picked up' : lb.text) + (s.bonus ? ' · ' + s.strokes + ' strokes, swish −' + s.bonus : '')) + '</td>';
+        nt += s.time || 0; tt += s.time || 0;
+        h4 += '<td>' + (s.time ? fmtTimeS(s.time) : '–') + '</td>';
+      } else { h3 += '<td class="none">·</td>'; h4 += '<td class="none">·</td>'; }
       if (course && num === 9 && i < n - 1) sub('Out');
     }
     if (course) {
@@ -954,7 +1311,8 @@
       if (off === 0 && lastNum <= 9) { h1 += '<th class="sum tot">Out</th>'; } else if (off >= 9) { h1 += '<th class="sum tot">In</th>'; } else { sub('In'); h1 += '<th class="sum tot">Tot</th>'; }
     } else h1 += '<th class="sum tot">Tot</th>';
     h1 += '</tr>'; h2 += '<td class="sum tot">' + tp + '</td></tr>'; h3 += '<td class="sum tot"><b>' + ts + '</b>' + (tp ? ' ' + relTag(ts, tp) : '') + '</td></tr>';
-    return '<div class="scroll-x"><table class="scorecard">' + h1 + h2 + h3 + '</table></div>';
+    h4 += '<td class="sum tot">' + (tt ? fmtTimeS(tt) : '') + '</td></tr>';
+    return '<div class="scroll-x"><table class="scorecard">' + h1 + h2 + h3 + (timed ? h4 : '') + '</table></div>';
   }
   const LEGEND = '<div class="legend">' + scv(3, 'eagle') + 'eagle ' + scv(3, 'birdie') + 'birdie ' + scv(4, 'par') + 'par ' + scv(5, 'bogey') + 'bogey ' + scv(6, 'dbogey') + 'double+ ' + scv(7, 'x') + 'picked up</div>';
   SCREENS.scorecard = function (args) {
@@ -981,14 +1339,17 @@
     if (args.dailyBest) badges += '<span class="badge">' + ic('trophy') + 'New daily best</span>';
     if (args.bonus) badges += '<span class="badge">' + ic('star') + 'Completion bonus +' + args.bonus + '</span>';
     if (tb) badges += '<span class="badge swish">' + ic('swish') + tb + ' swish' + (tb > 1 ? 'es' : '') + ' · −' + tb + '</span>';
+    if (args.fast) badges += '<span class="badge">' + ic('bolt') + 'Fast round</span>';
+    if (args.newBestTime) badges += '<span class="badge">' + ic('clock') + 'New best time</span>';
+    if (args.streak && args.streak.cur > 1) badges += '<span class="badge">' + ic('fire') + args.streak.cur + '-day streak</span>';
     const rn = args.round && G.Progress.ROUND_NAMES[args.round] ? G.Progress.ROUND_NAMES[args.round] : '';
     render('<div class="center-col"><div class="card pop wide result">' +
-      '<div class="card-k">' + esc(run.def ? run.def.name : '') + (rn ? ' · ' + esc(rn) : '') + '</div>' +
+      '<div class="card-k">' + (args.remix ? ic('mirror') + 'Remix · ' : '') + esc(run.def ? run.def.name : '') + (rn ? ' · ' + esc(rn) : '') + '</div>' +
       '<div class="hd-label eagle">' + esc(args.title || 'Course complete!') + '</div>' +
       '<div class="res-big ' + relCls(ts, tp) + '"><b>' + relPar(ts, tp) + '</b><small>' + (d < 0 ? 'under par' : d > 0 ? 'over par' : 'level par') + '</small></div>' +
-      scoreTiles([['Total', ts], ['Par', tp], args.stars !== undefined ? ['Stars', args.stars, 'gold'] : null, ['Birdies+', birdies], tb ? ['Swishes', tb, 'swb'] : null]) +
+      scoreTiles([['Total', ts], ['Par', tp], args.stars !== undefined ? ['Stars', args.stars, 'gold'] : null, ['Birdies+', birdies], tb ? ['Swishes', tb, 'swb'] : null, args.time ? ['Time', fmtTimeS(args.time)] : null]) +
       (badges ? '<div class="badges">' + badges + '</div>' : '') +
-      scorecardHtml(run) + unlockStrip(items) +
+      scorecardHtml(run) + (args.share ? shareCard(args.share) : '') + unlockStrip(items) +
       (args.code ? '<div class="code-row"><span>Course code</span><b class="code">' + esc(args.code) + '</b><button class="btn sm ghost" data-act="copy">' + ic('copy') + 'Copy</button></div>' : '') +
       '<div class="menu row">' + (args.replay !== false ? '<button class="btn ghost" data-act="replay">' + ic('replay') + 'Play again</button>' : '') +
       '<button class="btn big primary grow" data-act="done">Continue' + ic('next') + '</button></div></div></div>', 'dim');
@@ -997,6 +1358,8 @@
     on({
       replay: () => { click(); App().replayRun(); },
       copy: () => copyText(args.code),
+      scopy: () => copyText(args.share, 'Share card copied'),
+      sshare: () => shareNative(args.share),
       done: () => { click(); App().quitToMenu(args.after); }, back: () => App().quitToMenu(args.after),
     });
   };
@@ -1006,18 +1369,26 @@
     const date = App().today();
     const best = G.Progress.dailyBest(date);
     const ok = !!(G.Generator && G.Generator.dailyCourse);
-    const all = G.Store.get('daily', {}) || {};
-    const dates = Object.keys(all).sort().reverse().slice(0, 7);
+    const hist = G.Progress.dailyHistory(), streak = G.Progress.dailyStreak();
+    const bestEver = hist.reduce((b, h) => (!b || h.total - h.par < b.total - b.par ? h : b), null);
+    const EM = { A: '🟪', B: '🟩', P: '⬜', O: '🟨', D: '🟥', X: '⬛' };
+    const row = (codes) => (codes || []).map((c) => (EM[c.charAt(0)] || '⬜') + (c.indexOf('*') > 0 ? '✨' : '')).join('');
+    const share = best && best.res ? App().shareText(date, best.total, best.par, best.res) : null;
     const pretty = (() => { try { return new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }); } catch (e) { return date; } })();
     let html = topbar('Daily', esc(pretty), { right: diffChip() }) + '<div class="page narrow">';
     html += '<div class="panel hero-panel"><div class="hp-ic cal">' + ic('calendar') + '<b>' + date.slice(8) + '</b></div>' +
       '<h2>Today\'s course</h2><p class="sub">A fresh 9-hole course every day — the same course for everyone.</p>' +
       (best ? '<div class="kv-row"><span><small>Today\'s best</small><b>' + best.total + '</b></span><span><small>vs par</small><b>' + relTag(best.total, best.par) + '</b></span></div>' : '<div class="chip-note">Not played yet today</div>') +
       (ok ? '<button class="btn big primary" data-act="play">' + ic('play') + (best ? 'Play again' : 'Play today\'s course') + '</button>' : '<div class="empty small">Generator not loaded.</div>') + '</div>';
-    if (dates.length) html += section(ic('clock') + 'Recent', '<div class="lb">' + dates.map((d) => '<div class="lbr' + (d === date ? ' hl' : '') + '"><span>' + d + '</span><span><b>' + all[d].total + '</b> ' + relTag(all[d].total, all[d].par) + '</span></div>').join('') + '</div>');
+    html += '<div class="stat-hero daily-stats"><div class="stat gold"><span class="stat-ic">' + ic('fire') + '</span><b>' + streak.cur + '</b><small>Day streak</small></div>' +
+      '<div class="stat violet"><span class="stat-ic">' + ic('trophy') + '</span><b>' + streak.best + '</b><small>Best streak</small></div>' +
+      '<div class="stat blue"><span class="stat-ic">' + ic('calendar') + '</span><b>' + hist.length + '</b><small>Days played</small></div>' +
+      '<div class="stat green"><span class="stat-ic">' + ic('medal') + '</span><b>' + (bestEver ? relPar(bestEver.total, bestEver.par) : '–') + '</b><small>Best ever' + (bestEver ? ' · ' + esc(bestEver.date.slice(5)) : '') + '</small></div></div>';
+    if (share) html += section(ic('share') + 'Today\'s card', shareCard(share));
+    if (hist.length) html += section(ic('clock') + 'Your daily history', '<div class="lb dlb">' + hist.slice(0, 30).map((h) => '<div class="lbr' + (h.date === date ? ' hl' : '') + (bestEver && h.date === bestEver.date ? ' best' : '') + '"><span>' + esc(h.date) + '</span><span><b>' + h.total + '</b> ' + relTag(h.total, h.par) + '</span><span class="emo">' + row(h.res) + '</span><span class="dim">' + (h.time ? fmtTimeS(h.time) : '') + '</span></div>').join('') + '</div>');
     html += '</div>';
     render(html, 'list');
-    on({ back: () => show('title'), play: () => { click(); App().startDaily(); } });
+    on({ back: () => show('title'), play: () => { click(); App().startDaily(); }, scopy: () => copyText(share, 'Share card copied'), sshare: () => shareNative(share) });
   };
 
   // ----- random course -----
@@ -1040,13 +1411,24 @@
       play: () => { click(); const el = scr().querySelector('.seed'); seed = R.codeToSeed(el.value); App().startRandom(seed); },
     });
   };
-  function copyText(t) {
-    try { navigator.clipboard.writeText(t).then(() => toast('Copied ' + t, 'info'), () => fallbackCopy(t)); } catch (e) { fallbackCopy(t); }
+  function copyText(t, msg) {
+    const ok = () => toast(msg || ('Copied ' + t), 'info');
+    try { if (!navigator.clipboard || !window.isSecureContext) throw new Error('no clipboard'); navigator.clipboard.writeText(t).then(ok, () => fallbackCopy(t, msg)); } catch (e) { fallbackCopy(t, msg); }
   }
-  function fallbackCopy(t) {
-    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); toast('Copied ' + t, 'info'); } catch (e) { toast('Code: ' + t, 'info', 4000); }
+  function fallbackCopy(t, msg) {
+    const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    if (ok) toast(msg || ('Copied ' + t), 'info'); else toast('Copy failed — select the text and copy it', 'warn', 3000);
     ta.remove();
+  }
+  function shareNative(t) {
+    if (navigator.share) { navigator.share({ text: t }).catch(() => { /* cancelled */ }); return; }
+    copyText(t, 'Share card copied');
+  }
+  function shareCard(text) {
+    const lines = String(text).split('\n');
+    return '<div class="share"><div class="share-h">' + ic('share') + 'Share your round</div><pre class="share-t" aria-label="Share text">' + esc(lines.slice(0, 2).join('\n')) + '\n<span class="dim">' + esc(lines.slice(2).join('\n')) + '</span></pre>' +
+      '<div class="share-b"><button class="btn sm" data-act="scopy">' + ic('copy') + 'Copy</button>' + (navigator.share ? '<button class="btn sm primary" data-act="sshare">' + ic('share') + 'Share</button>' : '') + '</div></div>';
   }
 
   // ----- endless setup -----
@@ -1057,10 +1439,11 @@
     return arr.map((p) => ({ id: p.id || p.preset, name: p.name || cap(p.id || p.preset), desc: p.desc || '', settings: Object.assign({}, p.settings || p, { preset: p.id || p.preset }) }));
   }
   function allGimmicks() { return allGimmicksList(); }
+  const gUnl = (g) => G.Progress.gimmickUnlocked(g);
   function cleanSettings(s) {
     const o = {
       preset: s.preset || 'custom', difficulty: +s.difficulty || 3, ramp: +s.ramp || 0,
-      gimmicks: (s.gimmicks || []).filter((g) => allGimmicks().indexOf(g) >= 0 || !allGimmicks().length), surfaces: (s.surfaces || surfaceList().slice(0, 3)).filter((x) => surfaceList().indexOf(x) >= 0), styles: (s.styles || styleList().map((x) => x.id)).slice(),
+      gimmicks: (s.gimmicks || []).filter((g) => (allGimmicks().indexOf(g) >= 0 || !allGimmicks().length) && gUnl(g)), surfaces: (s.surfaces || surfaceList().slice(0, 3)).filter((x) => surfaceList().indexOf(x) >= 0), styles: (s.styles || styleList().map((x) => x.id)).slice(),
       wind: +s.wind || 0, hazardDensity: s.hazardDensity === undefined ? 1 : +s.hazardDensity, strokeRule: s.strokeRule || 'par+2',
       seed: (s.seed >>> 0) || Math.floor(Math.random() * 0x3fffffff),
     };
@@ -1086,6 +1469,9 @@
     const packs = ((G.Manifest && G.Manifest.PACKS) || []).filter((p) => p && Array.isArray(p.gimmicks));
     const ok = !!(G.Generator && G.Generator.endlessHole);
     const chip = (on, act, val, label, title) => '<button class="chip ' + (on ? 'on' : '') + '" data-act="' + act + '" data-v="' + esc(val) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + label + '</button>';
+    const gchip = (g) => gUnl(g) ? chip(gset.has(g), 'gim', g, '<i class="ge">' + gimIcon(g) + '</i>' + esc(gimName(g)), gimDesc(g))
+      : '<button class="chip locked" data-act="glock" data-v="' + esc(g) + '" title="Complete its tutorial to unlock">' + ic('lock') + '<i class="ge">' + gimIcon(g) + '</i>' + esc(gimName(g)) + '<small>Complete its tutorial</small></button>';
+    const nUnl = allGimmicks().filter(gUnl).length;
     const key = G.Run.settingsKey(s), lb = G.Run.leaderboard(key);
     const slider = (label, name, min, max, v, txt) => '<div class="srow"><div class="sl"><b>' + label + '</b><small class="sv-' + name + '">' + txt + '</small></div><input type="range" min="' + min + '" max="' + max + '" step="1" value="' + v + '" data-in="' + name + '" style="--v:' + ((v - min) / (max - min) * 100) + '%"></div>';
     let html = topbar('Endless', 'Survive as many holes as you can', { right: diffChip() }) + '<div class="page narrow endless">';
@@ -1103,16 +1489,18 @@
     let gh = '';
     if (packs.length) {
       gh += '<div class="packs">' + packs.map((p, i) => {
-        const gs = p.gimmicks || [], n = gs.filter((g) => gset.has(g)).length, open = openPacks.has(i);
-        return '<div class="pack' + (open ? ' open' : '') + '"><div class="pack-h"><button class="pack-t" data-act="popen" data-v="' + i + '" aria-expanded="' + open + '">' + ic('next', 'chev') + '<b>' + esc(p.name || p.id) + '</b><small>' + n + '/' + gs.length + '</small></button>' +
-          '<button class="tri ' + (n === gs.length && gs.length ? 'on' : n ? 'part' : '') + '" data-act="pack" data-v="' + i + '" aria-label="Toggle all in ' + esc(p.name || p.id) + '">' + (n === gs.length && gs.length ? ic('check') : n ? '<i></i>' : '') + '</button></div>' +
-          (open ? '<div class="chips">' + gs.map((g) => chip(gset.has(g), 'gim', g, '<i class="ge">' + gimIcon(g) + '</i>' + esc(gimName(g)), gimDesc(g))).join('') + '</div>' : '') + '</div>';
+        const all = p.gimmicks || [], gs = all.filter(gUnl), n = gs.filter((g) => gset.has(g)).length, open = openPacks.has(i);
+        return '<div class="pack' + (open ? ' open' : '') + '"><div class="pack-h"><button class="pack-t" data-act="popen" data-v="' + i + '" aria-expanded="' + open + '">' + ic('next', 'chev') + '<b>' + esc(p.name || p.id) + '</b><small>' + n + '/' + gs.length + (gs.length < all.length ? ' · ' + (all.length - gs.length) + ' locked' : '') + '</small></button>' +
+          '<button class="tri ' + (n === gs.length && gs.length ? 'on' : n ? 'part' : '') + (gs.length ? '' : ' disabled') + '" data-act="pack" data-v="' + i + '" aria-label="Toggle all in ' + esc(p.name || p.id) + '">' + (n === gs.length && gs.length ? ic('check') : n ? '<i></i>' : '') + '</button></div>' +
+          (open ? '<div class="chips">' + all.map(gchip).join('') + '</div>' : '') + '</div>';
       }).join('') + '</div>';
       const inPack = new Set(); packs.forEach((p) => (p.gimmicks || []).forEach((g) => inPack.add(g)));
       const rest = allGimmicks().filter((g) => !inPack.has(g));
-      if (rest.length) gh += '<div class="sub-h">Other</div><div class="chips">' + rest.map((g) => chip(gset.has(g), 'gim', g, '<i class="ge">' + gimIcon(g) + '</i>' + esc(gimName(g)), gimDesc(g))).join('') + '</div>';
-    } else gh += '<div class="chips">' + allGimmicks().map((g) => chip(gset.has(g), 'gim', g, '<i class="ge">' + gimIcon(g) + '</i>' + esc(gimName(g)), gimDesc(g))).join('') + '</div>';
-    html += section(ic('grid') + 'Gimmicks <small>' + gset.size + '/' + allGimmicks().length + '</small>', gh, { right: '<span class="h-acts"><button class="mini" data-act="gall">All</button><button class="mini" data-act="gnone">None</button></span>' });
+      if (rest.length) gh += '<div class="sub-h">Other</div><div class="chips">' + rest.map(gchip).join('') + '</div>';
+    } else gh += '<div class="chips">' + allGimmicks().map(gchip).join('') + '</div>';
+    gh = '<div class="note">' + ic('grad') + (nUnl ? nUnl + ' of ' + allGimmicks().length + ' gimmicks unlocked. Complete a gimmick\'s tutorial to add it to Endless.' : 'No gimmicks unlocked yet — runs use classic golf holes. Complete gimmick tutorials to add them.') +
+      ' <button class="mini" data-act="tuts">Tutorials</button></div>' + gh;
+    html += section(ic('grid') + 'Gimmicks <small>' + gset.size + '/' + nUnl + '</small>', gh, { right: '<span class="h-acts"><button class="mini" data-act="gall">All</button><button class="mini" data-act="gnone">None</button></span>' });
     html += section(ic('flag') + 'Terrain', '<div class="sub-h">Surfaces</div><div class="chips">' + surfaceList().map((x) => chip(sset.has(x), 'surf', x, esc(cap(x)))).join('') + '</div>' +
       '<div class="sub-h">Styles</div><div class="chips">' + styleList().map((x) => chip(yset.has(x.id), 'style', x.id, esc(x.name))).join('') + '</div>');
     html += section(ic('dice') + 'Seed', '<div class="seedbox"><input class="seed" maxlength="12" value="' + G.RNG.seedToCode(s.seed) + '" data-in="seed" spellcheck="false" autocomplete="off" aria-label="Seed code">' +
@@ -1147,13 +1535,18 @@
       ramp: (d) => { click(); redraw({ ramp: +d.v }); },
       rule: (d) => { click(); redraw({ strokeRule: d.v }); },
       gim: (d) => { click(); redraw({ gimmicks: toggle(s.gimmicks, d.v) }); },
-      gall: () => { click(); redraw({ gimmicks: allGimmicks().slice() }); },
+      gall: () => { click(); redraw({ gimmicks: allGimmicks().filter(gUnl) }); },
+      glock: (d) => {
+        if (!G.Progress.tutorialHole(d.v)) { A().sfx('uiback'); toast('Locked — complete its tutorial (' + (G.Progress.hasTutorials() ? 'not available yet' : 'coming soon') + ')', 'warn'); return; }
+        click(); App().startTutorial(d.v, { ret: { screen: 'endless', args: { s, scroll: scr().scrollTop } } });
+      },
+      tuts: () => { click(); show('tutorials', { ret: 'endless', retArgs: { s } }); },
       gnone: () => { click(); redraw({ gimmicks: [] }); },
       popen: (d) => { click(); const i = +d.v; if (openPacks.has(i)) openPacks.delete(i); else openPacks.add(i); show('endless', { s, scroll: scr().scrollTop }); },
       pack: (d) => {
         click(); const p = packs[+d.v]; if (!p) return; const gs = p.gimmicks || [];
-        const allOn = gs.every((g) => gset.has(g));
-        const st = new Set(s.gimmicks); gs.forEach((g) => (allOn ? st.delete(g) : st.add(g)));
+        const allOn = gs.filter(gUnl).every((g) => gset.has(g));
+        const st = new Set(s.gimmicks); gs.filter(gUnl).forEach((g) => (allOn ? st.delete(g) : st.add(g)));
         const sf = new Set(s.surfaces); if (!allOn) (p.surfaces || []).forEach((x) => sf.add(x));
         redraw({ gimmicks: [...st], surfaces: [...sf] });
       },
@@ -1200,7 +1593,7 @@
   function back() { const fn = acts.back; if (fn) { A() && A().sfx('uiback'); fn({}); return true; } return false; }
 
   G.UI = {
-    init, show, hide, toast, bigLabel, introCard, clearIntro, swishBanner, gimIcon, showHud, updateHud, loaderUpdate, back, unlockToasts, icon: ic, drawCosmetic: drawCos,
+    init, show, hide, toast, bigLabel, introCard, clearIntro, swishBanner, gimIcon, showHud, updateHud, loaderUpdate, back, unlockToasts, achToasts, setCoach, icon: ic, drawCosmetic: drawCos, fmtTime,
     get current() { return current; }, get args() { return curArgs; }, hudClick,
   };
 })();

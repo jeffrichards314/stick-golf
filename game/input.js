@@ -32,7 +32,8 @@
       if (I.ptrs.size > 2) return;
       if (e.button === 2 || e.button === 1 || looking()) { I.mode = 'pan'; I.last = p; call('lookStart'); return; }
       if (e.button === 0) {
-        I.mode = call('aimStart', p[0], p[1]) === false ? 'pan' : 'aim';
+        I.ptype = e.pointerType || 'mouse';
+        I.mode = call('aimStart', p[0], p[1], I.ptype) === false ? 'pan' : 'aim';
         I.last = p;
         if (I.mode === 'pan') call('lookStart');
       }
@@ -41,7 +42,7 @@
       if (!I.ptrs.has(e.pointerId)) return;
       const p = pos(e);
       I.ptrs.set(e.pointerId, p);
-      if (I.mode === 'aim') call('aimMove', p[0], p[1]);
+      if (I.mode === 'aim') call('aimMove', p[0], p[1], I.ptype);
       else if (I.mode === 'pan') { call('pan', p[0] - I.last[0], p[1] - I.last[1]); I.last = p; }
       else if (I.mode === 'pinch' && I.ptrs.size >= 2) {
         const a = [...I.ptrs.values()];
@@ -91,6 +92,11 @@
       call('keyUp', e.code, e);
     });
     window.addEventListener('blur', () => { I.keys = {}; I.lookHeld = false; });
+    // no accidental page zoom / scroll on phones while dragging (iOS ignores user-scalable=no)
+    ['gesturestart', 'gesturechange'].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => { const now = Date.now(); if (now - lastTouchEnd < 320 && e.target === canvas) e.preventDefault(); lastTouchEnd = now; }, { passive: false });
     I.isLooking = looking;
     I.cancel = () => { if (I.mode === 'aim') call('aimEnd', 0, 0, true); I.mode = null; I.ptrs.clear(); };
     return I;

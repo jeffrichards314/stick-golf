@@ -16,6 +16,15 @@
   App.applyAudio = function () {
     const s = G.Store.getSettings();
     G.Audio.setMute(s.mute); G.Audio.setVolumes(s.sfxVol);
+    if (G.Music) G.Music.set(!!s.bgm, s.bgmVol);
+  };
+  // accessibility / display classes on <body>
+  App.applyA11y = function () {
+    const s = G.Store.getSettings(), b = document.body;
+    b.classList.toggle('cb', !!s.colorblind);
+    b.classList.toggle('rfx', G.Store.reducedFx());
+    b.classList.toggle('big-touch', !!s.bigTouch);
+    b.classList.toggle('hc', !!s.highContrast);
   };
   App.toggleMute = function () {
     const s = G.Store.getSettings(); G.Store.saveSettings({ mute: !s.mute }); App.applyAudio();
@@ -61,12 +70,20 @@
       const rn = G.Progress.ROUND_NAMES[r.round] || '';
       sub = 'Hole ' + ((r.offset || 0) + r.idx + 1) + ' · ' + rn + ' ·';
       kicker = 'Hole ' + ((r.offset || 0) + r.idx + 1); mode = rn + ' · ' + (r.idx + 1) + '/' + r.n;
-    } else { sub = 'Hole ' + (r.idx + 1) + '/' + r.n + ' ·'; kicker = 'Hole ' + (r.idx + 1) + '/' + r.n; mode = 'Practice'; }
-    if (!total) { const t = rel(); if (t !== null) total = { label: 'Total', value: t }; }
-    return { sub, kicker, mode, total, allowRestart: r.kind === 'dev' };
+    } else if (r.kind === 'practice') { kicker = 'Hole ' + ((r.offset || 0) + 1); mode = 'Practice' + (r.def && r.def.name ? ' · ' + r.def.name : ''); }
+    else if (r.kind === 'tutorial') { kicker = 'Tutorial'; mode = 'Unlimited strokes · restart any time'; }
+    else { sub = 'Hole ' + (r.idx + 1) + '/' + r.n + ' ·'; kicker = 'Hole ' + (r.idx + 1) + '/' + r.n; mode = 'Practice'; }
+    if (r.kind === 'course' && r.remix) mode = 'Remix · ' + mode;
+    if (!total && r.kind !== 'practice' && r.kind !== 'tutorial') { const t = rel(); if (t !== null) total = { label: 'Total', value: t }; }
+    const s = App.session;
+    const timed = r.kind === 'course' || r.kind === 'daily' || r.kind === 'random' || r.kind === 'practice' || r.kind === 'tutorial';
+    const roundT = (r.times || []).reduce((a, x) => a + (x || 0), 0) + (s && !r.scores[r.idx] ? s.clock : 0);
+    return { sub, kicker, mode, total, allowRestart: r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial',
+      clock: timed && s ? { hole: s.clock, round: r.n > 1 ? roundT : null } : null, showMe: (r.kind === 'practice' || r.kind === 'tutorial') && s && s.hasBotHint() };
   }
   // ---------- lifetime stats + cosmetic unlocks ----------
   function checkUnlocks(r) {
+    try { if (G.Achievements) G.Achievements.check(); } catch (e) { console.warn('[ach]', e); }
     let items = [];
     try { items = G.Progress.newUnlockItems(); } catch (e) { console.warn('[unlocks]', e); }
     if (items.length) {
@@ -76,10 +93,11 @@
     return items;
   }
   function holeStats(r, res) {
-    if (!r || r.kind === 'dev') return;
+    if (!r || r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial') return;
     try { G.Progress.recordHoleStats(res, r.kind); } catch (e) { console.warn('[stats]', e); }
   }
   function strokeLimitFor(run, par) {
+    if (run.kind === 'practice' || run.kind === 'tutorial') return Infinity;
     if (run.kind === 'endless') {
       const rule = run.settings.strokeRule || 'par+2';
       if (rule === 'unlimited') return Infinity;
@@ -110,7 +128,13 @@
     G.UI.hide(); G.UI.showHud(true);
     if (App.lookToggle) App.toggleLook();
     App.state = 'play';
-    introduce(r, i, hole);
+    try { if (G.Music) G.Music.setTheme(theme && typeof theme.index === 'number' ? theme.index : 0); } catch (e) { /* */ }
+    // coach card (tutorial) / practice bar
+    if (r.kind === 'tutorial') G.UI.setCoach({ kind: 'tutorial', type: r.tutorial, hint: App.session.hasBotHint() });
+    else if (r.kind === 'practice') G.UI.setCoach({ kind: 'practice', hint: App.session.hasBotHint(), name: hole.name });
+    else G.UI.setCoach(null);
+    if (r.kind !== 'tutorial') introduce(r, i, hole);
+    else G.Progress.markGimmicksSeen((hole.gm || []).map((g) => g && g.t).filter(Boolean));
   }
   // "New gimmick" intro cards during the pre-shot pan + token hint
   function introduce(r, i, hole) {
@@ -134,16 +158,36 @@
     const r = App.run, i = r.idx;
     let newBest = false;
     const score = res.score !== undefined ? res.score : res.strokes;
-    r.scores[i] = { strokes: res.strokes, bonus: res.bonus || 0, score, par: res.par, swish: !!res.swish };
-    if (r.kind === 'course') { const rec = G.Progress.recordHole(r.courseId, (r.offset || 0) + i, score, res.par); newBest = rec.newBest && rec.prevStars > 0; }
+    if (r.kind === 'practice' || r.kind === 'tutorial') {
+      G.UI.showHud(false);
+      let first = false;
+      if (r.kind === 'practice') G.Store.bumpStat('practice');
+      else first = G.Progress.markTutorialDone(r.tutorial);
+      setTimeout(() => checkUnlocks(r), 500);
+      G.UI.show(r.kind === 'practice' ? 'practiceDone' : 'tutorialDone', { res, score, first, name: App.session.hole.name, time: res.time });
+      return;
+    }
+    r.scores[i] = { strokes: res.strokes, bonus: res.bonus || 0, score, par: res.par, swish: !!res.swish, time: res.time || 0 };
+    (r.times = r.times || [])[i] = res.time || 0;
+    if (r.kind === 'course' && !r.remix) { const rec = G.Progress.recordHole(r.courseId, (r.offset || 0) + i, score, res.par); newBest = rec.newBest && rec.prevStars > 0; }
+    if (r.kind !== 'dev' && G.Achievements) {
+      const ev = [];
+      if (score < res.par && (res.time || 0) > 0 && res.time < 8) ev.push('lightning_hole');
+      if (score < res.par && res.hazards > 0) ev.push('comeback');
+      if (ev.length) G.Achievements.grant(ev);
+    }
     if (r.kind === 'endless') { const b = Math.max(0, res.par - score); r.cleared++; r.underPar += b; r.score += 1 + b; G.Store.maxStat('endless', r.cleared); G.Store.maxStat('endlessScore', r.score); }
-    holeStats(r, { strokes: res.strokes, score, par: res.par, swish: !!res.swish });
+    holeStats(r, { strokes: res.strokes, score, par: res.par, swish: !!res.swish, spin: !!res.spin });
     G.UI.showHud(false);
     setTimeout(() => checkUnlocks(r), 700);
     G.UI.show('holeDone', { res, last: i >= r.n - 1, newBest, name: App.session.hole.name });
   }
   function onFailed(res) {
     const r = App.run;
+    if (r.kind === 'practice' || r.kind === 'tutorial') { // e.g. swamped by the flood: just start the hole again
+      setTimeout(() => { if (App.session && App.run === r) { App.session.restart(); G.UI.toast('Try again!', 'info', 1200); } }, 300);
+      return;
+    }
     G.UI.showHud(false);
     if (r.kind === 'endless') {
       const diff = G.Modes.get(r.diff).name;
@@ -158,7 +202,8 @@
     const sess = App.session, i = r.idx;
     const lim = sess && sess.limit !== Infinity ? sess.limit : (res.strokes || 0) + 1;
     const x = lim + 1;
-    r.scores[i] = { strokes: x, bonus: 0, score: x, par: res.par, failed: true, reason: res.reason || null };
+    r.scores[i] = { strokes: x, bonus: 0, score: x, par: res.par, failed: true, reason: res.reason || null, time: res.time || 0 };
+    (r.times = r.times || [])[i] = res.time || 0;
     holeStats(r, { strokes: res.strokes || 0, score: x, par: res.par, failed: true });
     G.UI.show('holeFail', { res, score: x, last: i >= r.n - 1, name: sess && sess.hole ? sess.hole.name : '' });
   }
@@ -166,13 +211,23 @@
     const r = App.run;
     const complete = r.scores.length >= r.n && r.scores.every((s) => !!s); // picked-up holes still finish the round
     const args = { after: null };
-    if (r.kind === 'course') {
+    const sc = (s) => (s.score !== undefined ? s.score : s.strokes);
+    const roundTime = (r.times || []).reduce((a, x) => a + (x || 0), 0);
+    args.time = roundTime;
+    if (complete && (r.kind === 'course' || r.kind === 'daily' || r.kind === 'random')) {
+      try { roundAchievements(r, args, roundTime); } catch (e) { console.warn('[ach]', e); }
+    }
+    if (r.kind === 'course' && r.remix) {
+      if (complete && r.startIdx === 0) { args.newBest = G.Progress.recordRemix(r.courseId, r.round, r.totalStrokes()); G.Store.bumpStat('remixRounds'); }
+      args.round = r.round; args.remix = true;
+      args.title = complete ? 'Remix complete!' : 'Round finished';
+      args.after = 'course';
+    } else if (r.kind === 'course') {
       const after = G.Progress.courseInfo(r.courseId);
       args.bonus = Math.max(0, after.bonus - (r.bonusBefore || 0));
       if (complete && r.startIdx === 0) {
         args.newBest = G.Progress.recordRound(r.courseId, r.round, r.totalStrokes());
         if (r.round === 'all' && r.n > 9) { // an 18-hole round also counts as a front-9 and a back-9 round
-          const sc = (s) => (s.score !== undefined ? s.score : s.strokes);
           G.Progress.recordRound(r.courseId, 'front', r.scores.slice(0, 9).reduce((t, s) => t + sc(s), 0));
           G.Progress.recordRound(r.courseId, 'back', r.scores.slice(9).reduce((t, s) => t + sc(s), 0));
         }
@@ -186,7 +241,11 @@
       args.after = 'course';
     } else if (r.kind === 'daily') {
       if (complete) G.Store.bumpStat('daily');
-      if (complete) args.dailyBest = G.Progress.recordDaily(r.date, r.totalStrokes(), r.scores.reduce((a, s) => a + s.par, 0), r.scores.map((s) => (s.score !== undefined ? s.score : s.strokes)));
+      if (complete) {
+        args.dailyBest = G.Progress.recordDaily(r.date, r.totalStrokes(), r.scores.reduce((a, s) => a + s.par, 0), r.scores.map(sc), App.resultCodes(r.scores), roundTime);
+        args.share = App.shareText(r.date, r.totalStrokes(), r.scores.reduce((a, s) => a + s.par, 0), App.resultCodes(r.scores));
+        args.streak = G.Progress.dailyStreak();
+      }
       args.title = 'Daily complete!'; args.after = 'daily';
     } else if (r.kind === 'random') {
       if (complete) G.Store.bumpStat('randoms');
@@ -194,12 +253,62 @@
     } else args.after = 'title';
     if (r.kind !== 'dev') checkUnlocks(r);
     args.unlocks = (r.unlocked || []).slice();
+    if (G.Haptics && complete) G.Haptics.buzz('hole');
     G.UI.showHud(false);
     G.UI.show('courseDone', args);
   }
 
+  // ---------- round-end achievements, fast rounds, best times ----------
+  function roundAchievements(r, args, time) {
+    const sc = (s) => (s.score !== undefined ? s.score : s.strokes);
+    const ts = r.totalStrokes(), tp = r.scores.reduce((a, s) => a + s.par, 0), under = ts < tp;
+    const ev = [];
+    if (under) ev.push('under_par_round');
+    const okHole = (s) => s && !s.failed && sc(s) <= s.par;
+    for (let a = 0; a + 9 <= r.scores.length; a += 9) {
+      const nine = r.scores.slice(a, a + 9);
+      if (nine.every(okHole)) ev.push('clean_nine');
+      const nt = nine.reduce((x, s) => x + (s.time || 0), 0), ns = nine.reduce((x, s) => x + sc(s), 0), np = nine.reduce((x, s) => x + s.par, 0);
+      if (ns < np && nt > 0 && nt < 180) ev.push('speed_nine');
+    }
+    if (r.scores.length >= 18) {
+      if (r.scores.every(okHole)) ev.push('perfect_round');
+      if (!(r.mulligans && r.mulligans.used)) ev.push('no_mulligan_round');
+      if (under && time > 0 && time < 480) ev.push('speed_18');
+    }
+    if (under && (r.diff === 'pro' || r.diff === 'insane')) ev.push('pro_round');
+    if (r.diff === 'insane') ev.push('insane_round');
+    if (r.kind === 'course' && r.remix && under) ev.push('remix_under_par');
+    if (G.Achievements) G.Achievements.grant(ev);
+    if (under && time > 0 && time < 20 * tp) { G.Store.bumpStat('fastRounds'); args.fast = true; }
+    if (under && r.kind === 'course' && r.startIdx === 0 && time > 0) args.newBestTime = G.Progress.recordTime(r.courseId, (r.remix ? 'rx-' : '') + r.round, time);
+  }
+  // ---------- daily share card ----------
+  App.resultCodes = function (scores) {
+    return scores.map((s) => {
+      if (!s) return 'X';
+      if (s.failed) return 'X';
+      const v = s.score !== undefined ? s.score : s.strokes, d = v - s.par;
+      const c = s.strokes === 1 || v <= 1 || d <= -2 ? 'A' : d === -1 ? 'B' : d === 0 ? 'P' : d === 1 ? 'O' : 'D';
+      return c + (s.swish ? '*' : '');
+    });
+  };
+  const EMOJI = { A: '🟪', B: '🟩', P: '⬜', O: '🟨', D: '🟥', X: '⬛' };
+  App.SHARE_URL = 'https://jeffrichards314.github.io/stick-golf/';
+  App.shareText = function (date, total, par, codes) {
+    const d = total - par, rel = d === 0 ? 'E' : d > 0 ? '+' + d : '−' + Math.abs(d);
+    const row = (codes || []).map((c) => (EMOJI[c.charAt(0)] || '⬜') + (c.indexOf('*') > 0 ? '✨' : '')).join('');
+    return 'Stick Golf Daily ' + date + ' · ' + total + ' (' + rel + ') ⛳\n' + row + '\n' + App.SHARE_URL;
+  };
+
   // round: 'all' | 'front' | 'back' (default: the nine containing holeIdx). holeIdx is 0-based over the full course.
-  App.startCourse = function (id, holeIdx, round) {
+  App.startCourse = function (id, holeIdx, round) { startCourseRun(id, holeIdx, round, false); };
+  // Remix: the course's holes mirrored (tee on the right), played as a normal round with separate bests
+  App.startRemix = function (id, round) {
+    if (!G.Generator || !G.Generator.mirrorHole) { G.UI.toast('Remix is not available yet', 'warn'); return; }
+    startCourseRun(id, 0, round || 'all', true);
+  };
+  function startCourseRun(id, holeIdx, round, remix) {
     holeIdx = Math.max(0, holeIdx | 0);
     const def = G.Progress.def(id);
     G.UI.show('loading', { title: 'Loading course…', sub: def ? def.name : id });
@@ -209,16 +318,48 @@
       if (round !== 'all' && round !== 'front' && round !== 'back') round = holeIdx >= 9 && n > 9 ? 'back' : 'front';
       if (n <= 9) round = 'front';
       const a = round === 'back' ? 9 : 0, b = round === 'front' ? Math.min(9, n) : n;
-      const r = G.Run.fromHoles('course', def, holes.slice(a, b), G.Modes.current());
-      r.round = round; r.offset = a; r.courseHoles = n;
+      let list = holes.slice(a, b);
+      if (remix) {
+        try { list = list.map((h) => { const m = G.Generator.mirrorHole(h); if (m && !/remix/i.test(m.name || '')) m.name = (h.name || 'Hole') + ' (Remix)'; return m; }); }
+        catch (e) { console.error('[remix]', e); G.UI.toast('Remix failed', 'warn'); G.UI.show('course', { id }); return; }
+      }
+      const r = G.Run.fromHoles('course', def, list, G.Modes.current());
+      r.round = round; r.offset = a; r.courseHoles = n; r.remix = !!remix; r.times = [];
       const rel = Math.max(0, Math.min(b - a - 1, holeIdx - a));
       // a round is played in order from its first hole; a hole index is only honoured for automation (?course=&hole=)
-      r.courseId = id; r.idx = App.allowHoleStart && holeIdx >= a && holeIdx < b ? rel : 0; r.startIdx = r.idx;
+      r.courseId = id; r.idx = !remix && App.allowHoleStart && holeIdx >= a && holeIdx < b ? rel : 0; r.startIdx = r.idx;
       r.bonusBefore = G.Progress.courseInfo(id).bonus;
       App.run = r; App.session = null;
       playCurrent();
     });
+  }
+  // Practice: any single hole of an unlocked course; unlimited strokes/restarts, nothing recorded but the practice count
+  App.startPractice = function (courseId, holeIdx) {
+    const def = G.Progress.def(courseId);
+    holeIdx = Math.max(0, holeIdx | 0);
+    G.UI.show('loading', { title: 'Loading hole…', sub: def ? def.name : courseId });
+    G.Progress.loadCourse(courseId, (holes, err) => {
+      if (!holes || !holes.length) { G.UI.toast('Could not load course (' + (err || '?') + ')', 'warn'); G.UI.show('practice'); return; }
+      holeIdx = Math.min(holes.length - 1, holeIdx);
+      const r = G.Run.fromHoles('practice', def, [holes[holeIdx]], G.Modes.current());
+      r.courseId = courseId; r.offset = holeIdx; r.courseHoles = holes.length; r.mulligans = { left: Infinity };
+      App.run = r; App.session = null;
+      playCurrent();
+    });
   };
+  // Tutorial: the gimmick's teaching hole (GOLF.TUTORIALS[type]); opts.ret = {screen, args} to go back to, opts.then = course id to offer next
+  App.startTutorial = function (type, opts) {
+    const hole = G.Progress.tutorialHole(type);
+    if (!hole) { G.UI.toast(G.Progress.hasTutorials() ? 'No tutorial for this gimmick yet' : 'Tutorials coming soon', 'info'); return false; }
+    const M = G.Manifest, cid = M && M.introducedBy ? M.introducedBy[type] : null;
+    const def = (cid && G.Progress.def(cid)) || null;
+    const r = G.Run.fromHoles('tutorial', def, [hole], G.Modes.current());
+    r.tutorial = type; r.opts = opts || {}; r.mulligans = { left: Infinity };
+    App.run = r; App.session = null;
+    playCurrent();
+    return true;
+  };
+  App.showMe = function (on) { const s = App.session; if (!s || !s.showMe) return false; const v = s.showMe(on); if (v) App.cam.skipIntro(); return v; };
   App.startDev = function () {
     const D = G.Dev;
     const h2 = JSON.parse(JSON.stringify(D.DEV_HOLE)); h2.name = 'Dev Hole 2'; h2.par = 4; h2.gm[0].ax = 60;
@@ -229,7 +370,10 @@
   };
   App.startEndless = function (settings) {
     if (!G.Generator || !G.Generator.endlessHole) { G.UI.toast('Generator not loaded', 'warn'); return; }
-    App.run = G.Run.endless(Object.assign({}, settings), G.Modes.current());
+    // only gimmicks whose tutorial is complete (none -> plain golf holes)
+    settings = Object.assign({}, settings);
+    settings.gimmicks = (settings.gimmicks || []).filter((g) => G.Progress.gimmickUnlocked(g));
+    App.run = G.Run.endless(settings, G.Modes.current());
     App.session = null;
     waitHole();
   };
@@ -268,12 +412,17 @@
     App.nextHole();
   };
   App.restartHole = function () {
-    if (!App.session || !App.run || App.run.kind !== 'dev') return; // rounds play straight through
-    App.session.restart(); G.Audio.sfx('uiback');
+    const k = App.run && App.run.kind;
+    if (!App.session || !(k === 'dev' || k === 'practice' || k === 'tutorial')) return; // rounds play straight through
+    App.session.restart(); App.session.paused = false; G.Audio.sfx('uiback');
+    if (G.UI.current) { G.UI.hide(); G.UI.showHud(true); }
   };
   App.replayRun = function () {
     const r = App.run;
-    if (r.kind === 'course') App.startCourse(r.courseId, r.offset || 0, r.round);
+    if (r.kind === 'course' && r.remix) App.startRemix(r.courseId, r.round);
+    else if (r.kind === 'course') App.startCourse(r.courseId, r.offset || 0, r.round);
+    else if (r.kind === 'practice') App.startPractice(r.courseId, r.offset || 0);
+    else if (r.kind === 'tutorial') App.startTutorial(r.tutorial, r.opts);
     else if (r.kind === 'daily') App.startDaily();
     else if (r.kind === 'random') App.startRandom(r.seed);
     else if (r.kind === 'dev') App.startDev();
@@ -294,15 +443,17 @@
     App.cam.look.on = App.lookToggle;
     G.UI.toast(App.lookToggle ? 'Look mode: drag to pan' : 'Look mode off', 'info', 1000);
   };
-  App.quitToMenu = function (screen) {
+  App.quitToMenu = function (screen, sargs) {
     const r = App.run;
-    G.UI.clearIntro();
+    G.UI.clearIntro(); G.UI.setCoach(null);
     App.session = null; App.waiting = false; App.run = null;
     if (App.lookToggle) { App.lookToggle = false; App.input.lookToggle = false; }
     G.UI.showHud(false);
     startAttract();
-    if (screen === 'course' && r && r.courseId) G.UI.show('course', { id: r.courseId });
-    else if (screen) G.UI.show(screen);
+    if (screen === 'course' && r && r.courseId) G.UI.show('course', { id: r.courseId, remix: !!r.remix });
+    else if (screen) G.UI.show(screen, sargs);
+    else if (r && r.kind === 'practice') G.UI.show('practiceCourse', { id: r.courseId });
+    else if (r && r.kind === 'tutorial') { const o = r.opts || {}; if (o.ret) G.UI.show(o.ret.screen, o.ret.args); else G.UI.show('tutorials'); }
     else if (r && r.kind === 'course' && r.courseId) G.UI.show('course', { id: r.courseId });
     else G.UI.show('title');
   };
@@ -316,6 +467,7 @@
         holeId: s.hole.id, par: s.hole.par, strokes: s.S.strokes, bonus: s.S.bonus || 0, score: s.score(),
         rest: !!s.S.rest, holed: !!s.S.holed, failed: s.S.failed || (s.state === 'failed' ? s.failReason || 'limit' : null), swish: !!s.S.swish,
         putt: s.isPutt(), spin: s.spin, limit: s.limit, x: s.S.x, y: s.S.y, playState: s.state, tokens: s.tokenInfo(),
+        clock: s.clock, lastShot: s.lastShot, ghost: !!s.ghostPts, showMe: !!s.botGhost, remix: !!(r && r.remix), tutorial: (r && r.tutorial) || null,
         result: s.result ? { strokes: s.result.strokes, score: s.result.score, bonus: s.result.bonus, holed: s.result.holed, reason: s.result.reason || null } : null,
       });
     }
@@ -438,8 +590,9 @@
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => setTimeout(resize, 200));
     document.addEventListener('visibilitychange', () => { if (document.hidden && App.session && !G.UI.current) App.pause(); });
-    App.applyAudio();
+    App.applyAudio(); App.applyA11y();
     G.Progress.newUnlocks(); // prime "seen" set
+    const migrated = G.Progress.migrationNotice();
     const bm = document.getElementById('boot-msg'); if (bm) bm.remove();
     if (G._missing && G._missing.length) console.warn('[golf] missing scripts:', G._missing.join(', '));
     // routing
@@ -448,6 +601,7 @@
     else {
       startAttract();
       if (!G.Store.getSettings().difficulty) G.UI.show('difficulty', { first: true, ret: 'title' });
+      else if (migrated) G.UI.show('notice', { kind: 'reorder' });
       else G.UI.show('title');
     }
     requestAnimationFrame(frame);
