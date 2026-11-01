@@ -388,16 +388,17 @@
     return nb;
   }
   function dayStr(dt) { const p = (n) => (n < 10 ? '0' : '') + n; return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate()); }
-  // consecutive days with a finished daily, ending today (or yesterday if today isn't played yet); best = longest ever
+  // consecutive days with the daily finished UNDER PAR (best result that day), ending today (or yesterday if
+  // today isn't done yet); best = longest ever
   function dailyStreak() {
     const d = Store.get('daily', {}) || {};
-    const has = (k) => !!d[k];
+    const has = (k) => !!d[k] && typeof d[k].total === 'number' && typeof d[k].par === 'number' && d[k].total < d[k].par;
     const now = new Date(); now.setHours(12, 0, 0, 0);
     const day = new Date(now);
     if (!has(dayStr(day))) day.setDate(day.getDate() - 1);
     let cur = 0;
     while (has(dayStr(day))) { cur++; day.setDate(day.getDate() - 1); }
-    const keys = Object.keys(d).sort(); let best = 0, run = 0, prev = null;
+    const keys = Object.keys(d).filter(has).sort(); let best = 0, run = 0, prev = null;
     keys.forEach((k) => { const t = new Date(k + 'T12:00:00'); run = prev && Math.round((t - prev) / 864e5) === 1 ? run + 1 : 1; best = Math.max(best, run); prev = t; });
     return { cur, best: Math.max(best, cur) };
   }

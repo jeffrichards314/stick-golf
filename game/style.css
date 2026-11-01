@@ -812,7 +812,7 @@ kbd { font-family: inherit; font-size: var(--fs-xs); font-weight: 800; color: va
 .srow .sl b .ico { color: var(--accent); }
 
 /* ---------- accessibility ---------- */
-/* colour-blind mode (Okabe–Ito: blue = good, orange = over, vermillion = bad). Scorecards also use shapes: circle = under, square = over */
+/* color-blind mode (Okabe–Ito: blue = good, orange = over, vermillion = bad). Scorecards also use shapes: circle = under, square = over */
 body.cb { --good: #56b4e9; --good-soft: rgba(86, 180, 233, 0.18); --bad: #d55e00; --bad-soft: rgba(213, 94, 0, 0.18); }
 body.cb .rel.over, body.cb .h-total.over b, body.cb .kv-row .rel.over b { color: #e69f00; }
 body.cb .scv.birdie { color: #56b4e9; box-shadow: inset 0 0 0 1.5px #56b4e9; }

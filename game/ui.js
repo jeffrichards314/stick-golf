@@ -620,7 +620,7 @@
     return list.find((c) => Pg.unlocked(c) && Pg.baked(c.id) && !Pg.courseInfo(c.id).cleared) || null;
   }
 
-  function streakTxt() { const s2 = G.Progress.dailyStreak ? G.Progress.dailyStreak() : { cur: 0 }; return s2.cur > 1 ? s2.cur + '-day streak' : 'New course daily'; }
+  function streakTxt() { const s2 = G.Progress.dailyStreak ? G.Progress.dailyStreak() : { cur: 0 }; return s2.cur > 1 ? s2.cur + '-day streak' : 'Under par keeps your streak'; }
   function tutTxt() { return G.Progress.hasTutorials() ? G.Progress.tutorialsDoneCount() + '/' + G.Progress.tutorialTotal() + ' done' : 'Coming soon'; }
   function achTxt() { const Ac = G.Achievements; return Ac ? Ac.count() + '/' + Ac.total() + ' earned' : ''; }
 
@@ -1077,7 +1077,7 @@
       sens('sensTouch', 'Touch drag sensitivity', +st.sensTouch || 1) + sens('sensMouse', 'Mouse drag sensitivity', +st.sensMouse || 1) +
       '<div class="srow"><div class="sl"><b>Precision putting</b><small>On the green the drag covers 0–40% power (with a scale); drag further for more</small></div>' + sw(st.precisionPutt !== false, 'precise') + '</div>');
     html += section(ic('access') + 'Accessibility',
-      '<div class="srow"><div class="sl"><b>Colour-blind mode</b><small>Safer colours plus patterns and shapes for hazards and scores</small></div>' + sw(!!st.colorblind, 'cb') + '</div>' +
+      '<div class="srow"><div class="sl"><b>Color-blind mode</b><small>Safer colors plus patterns and shapes for hazards and scores</small></div>' + sw(!!st.colorblind, 'cb') + '</div>' +
       '<div class="srow"><div class="sl"><b>Reduced effects</b><small>No shake, fewer particles and animations' + (st.reducedFx === null || st.reducedFx === undefined ? ' · following your system setting' : '') + '</small></div>' + sw(rfx, 'rfx') + '</div>' +
       '<div class="srow"><div class="sl"><b>Larger touch targets</b><small>Bigger HUD buttons and controls</small></div>' + sw(!!st.bigTouch, 'bigt') + '</div>' +
       '<div class="srow"><div class="sl"><b>High-contrast UI</b><small>Solid panels, stronger outlines and text</small></div>' + sw(!!st.highContrast, 'hc') + '</div>');
@@ -1380,7 +1380,7 @@
       '<h2>Today\'s course</h2><p class="sub">A fresh 9-hole course every day — the same course for everyone.</p>' +
       (best ? '<div class="kv-row"><span><small>Today\'s best</small><b>' + best.total + '</b></span><span><small>vs par</small><b>' + relTag(best.total, best.par) + '</b></span></div>' : '<div class="chip-note">Not played yet today</div>') +
       (ok ? '<button class="btn big primary" data-act="play">' + ic('play') + (best ? 'Play again' : 'Play today\'s course') + '</button>' : '<div class="empty small">Generator not loaded.</div>') + '</div>';
-    html += '<div class="stat-hero daily-stats"><div class="stat gold"><span class="stat-ic">' + ic('fire') + '</span><b>' + streak.cur + '</b><small>Day streak</small></div>' +
+    html += '<div class="stat-hero daily-stats"><div class="stat gold"><span class="stat-ic">' + ic('fire') + '</span><b>' + streak.cur + '</b><small>Day streak (under par)</small></div>' +
       '<div class="stat violet"><span class="stat-ic">' + ic('trophy') + '</span><b>' + streak.best + '</b><small>Best streak</small></div>' +
       '<div class="stat blue"><span class="stat-ic">' + ic('calendar') + '</span><b>' + hist.length + '</b><small>Days played</small></div>' +
       '<div class="stat green"><span class="stat-ic">' + ic('medal') + '</span><b>' + (bestEver ? relPar(bestEver.total, bestEver.par) : '–') + '</b><small>Best ever' + (bestEver ? ' · ' + esc(bestEver.date.slice(5)) : '') + '</small></div></div>';

@@ -21,7 +21,7 @@
   function hash1(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
   const rnd = (a, b) => a + (b - a) * Math.random();
 
-  // ---------------------------------------------------------------- colour utils
+  // ---------------------------------------------------------------- color utils
   const _rgbC = Object.create(null);
   function rgb(c) {
     if (Array.isArray(c)) return c;
@@ -190,7 +190,7 @@
       { id: 'perfect', name: 'Perfection', shape: 'rect', L: 42, fill: 'gold', cols: ['#ffcf3a', '#fff6c8', '#a06a00'], emblem: 'crown', ec: '#fff6d0', rarity: 'legendary', unlock: ACH('perfect_round') },
     ],
     palettes: [
-      { id: 'default', name: 'Course Colours', override: null, rarity: 'common', unlock: FREE },
+      { id: 'default', name: 'Course Colors', override: null, rarity: 'common', unlock: FREE },
       { id: 'pastel', name: 'Pastel', override: { post: { white: 0.38 } }, rarity: 'common', unlock: FREE },
       { id: 'sunset', name: 'Golden Hour', override: { skyTop: '#2b1b4f', skyBottom: '#ff9a62', far: '#a04e7a', mid: '#7a3664', near: '#4e2048', post: { tint: '#ff9a5c', amt: 0.16 } }, rarity: 'common', unlock: U('holes', 36) },
       { id: 'sepia', name: 'Sepia', override: { post: { mono: true, tint: '#b08a5a', amt: 0.42 } }, rarity: 'common', unlock: U('stars', 120) },
@@ -225,7 +225,7 @@
   const RAINBOW6 = ['#ff3a3a', '#ff9a2a', '#ffe23a', '#3ad85a', '#3a8aff', '#9a5aff'];
   const byId = (list, id) => list.find((e) => e.id === id) || list[0];
 
-  // ---------------------------------------------------------------- themes / colours
+  // ---------------------------------------------------------------- themes / colors
   const PAL_KEYS = ['skyTop', 'skyBottom', 'far', 'mid', 'near', 'ground', 'groundDark', 'accent', 'text'];
   const DEFAULT_THEME = {
     id: 'default', name: 'Default',
@@ -914,7 +914,7 @@
     if (!p) { p = ctx.createPattern(_hatch.c, 'repeat'); _hatch.pats.set(ctx, p); }
     return p;
   }
-  // ---- colour-blind overlay patterns (transparent tiles, drawn on top of the normal fill)
+  // ---- color-blind overlay patterns (transparent tiles, drawn on top of the normal fill)
   // wave = water, zig = lava, dots = void, diag = oob, stripe = green mow, laser = hazard dashes
   const _cbTiles = Object.create(null);
   const CB_TILE = {
@@ -1540,7 +1540,7 @@
     ctx.fillStyle = shade(c, 0.35); ctx.fillRect(x + 3, y + 3, w - 6, 2);
     ctx.fillStyle = shade(c, -0.2); ctx.fillRect(x + 3, y + h - 5, w - 6, 2);
   }
-  // padlock icon (colour-blind state tell): open = shackle lifted & swung aside
+  // padlock icon (color-blind state tell): open = shackle lifted & swung aside
   function padlock(ctx, x, y, s, open) {
     ctx.save(); ctx.translate(x, y); ctx.scale(s / 10, s / 10);
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(0, 0, 11, 0, TAU); ctx.fill();
@@ -2456,7 +2456,7 @@
       }
     }
   }
-  // flagSt = COSMETICS.flags entry (null -> classic); decoy = darken every colour slightly (the tell)
+  // flagSt = COSMETICS.flags entry (null -> classic); decoy = darken every color slightly (the tell)
   function drawFlag(ctx, sc, cup, t, holed, wave, fcol, decoy) {
     const { x, y } = cup, col = sc.col, top = y - 88;
     const st = decoy === 'plain' ? null : (sc.flagSt || null);
@@ -2467,7 +2467,7 @@
     const wv = (u) => Math.sin(t * 5.5 - u * 3.2) * u * amp;
     const fl = st && st.flip ? -1 : 1;
     const MX = (u) => x + fl * (1 + u * L), MY = (u, v) => top + v * H + wv(u);
-    // colour-blind decoy tell: a notch cut from the fly end + a square hole + square finial
+    // color-blind decoy tell: a notch cut from the fly end + a square hole + square finial
     const cbDecoy = decoy && decoy !== 'plain' && sc.cb;
     if (cbDecoy) {
       ctx.save(); ctx.beginPath(); ctx.rect(x - 200, top - 200, 400, 400);
@@ -2513,7 +2513,7 @@
         ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(MX(0.11), MY(0.11, 0.38), 2.6, 0, TAU); ctx.fill();
         ctx.fillStyle = '#111111'; ctx.beginPath(); ctx.arc(MX(0.11) + 0.5, MY(0.11, 0.38), 1.3, 0, TAU); ctx.fill();
       } else if (fillMode === 'mirror') {
-        // diagonal split, reflected colours + a moving glint line along the mirror seam
+        // diagonal split, reflected colors + a moving glint line along the mirror seam
         const poly = (pts) => { ctx.beginPath(); for (let k = 0; k < pts.length; k++) { const a = pts[k], b = pts[(k + 1) % pts.length]; for (let j = 0; j < 4; j++) { const q = j / 4, u = a[0] + (b[0] - a[0]) * q, v = a[1] + (b[1] - a[1]) * q; if (!k && !j) ctx.moveTo(MX(u), MY(u, v)); else ctx.lineTo(MX(u), MY(u, v)); } } ctx.closePath(); ctx.fill(); };
         ctx.fillStyle = cols[1]; poly([[0, 1.05], [1.05, -0.05], [1.05, 1.05]]);
         ctx.fillStyle = cols[2]; ctx.globalAlpha = 0.9; const q = frac(t * 0.4);
@@ -3114,7 +3114,7 @@
     ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 6 * k; ctx.beginPath(); ctx.arc(aim.x, aim.y, R0, 0, TAU); ctx.stroke();
     if (p > 0.001) { ctx.strokeStyle = c; ctx.lineWidth = 4.5 * k; ctx.beginPath(); ctx.arc(aim.x, aim.y, R0, -Math.PI / 2, -Math.PI / 2 + p * TAU); ctx.stroke(); }
     if (cb) {
-      // tick marks + labels every 25% so power is readable without the colour ramp
+      // tick marks + labels every 25% so power is readable without the color ramp
       ctx.font = '800 ' + (7 * k).toFixed(1) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       for (let q = 1; q <= 4; q++) {
         const a = -Math.PI / 2 + q / 4 * TAU, ca2 = Math.cos(a), sa2 = Math.sin(a);

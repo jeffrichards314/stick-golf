@@ -26,7 +26,7 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
 * **Progression:** 36 achievements, 139 cosmetics in 5 Locker categories (balls, trails, cup effects, flags, palettes), and a lifetime Stats screen.
 * **Settings:**
   * difficulty and feel: difficulty (Chill / Standard / Pro / Insane), haptics, optional music;
-  * accessibility: colour-blind mode (patterns and shapes instead of colour alone), reduced effects, larger touch targets, high contrast;
+  * accessibility: color-blind mode (patterns and shapes instead of color alone), reduced effects, larger touch targets, high contrast;
   * aiming: separate touch and mouse sensitivity, and precision putting.
 * **Human-feel par:** the build replays every bot solution with small aim and power errors. Holes whose shots need pixel-perfect precision get up to +2 par.
 

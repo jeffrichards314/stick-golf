@@ -197,5 +197,5 @@ faster than 20 s × round par) · `{type:'tutorials', n}` (tutorial holes comple
 ### Frame additions for the renderer (`R.draw(frame)`)
 * `frame.ghost = { points:[x0,y0,...], t }` — translucent ghost ball replaying the previous shot (or the bot hint); t = 0..1 progress.
 * `frame.prevAim = { angle, power }` — draw a faint marker of the previous shot's aim/power on the aim UI.
-* `frame.a11y = { colorblind:bool, reducedFx:bool }` — colour-blind-safe hazards (patterns/shapes, not just colour; decoy tell by shape),
+* `frame.a11y = { colorblind:bool, reducedFx:bool }` — color-blind-safe hazards (patterns/shapes, not just color; decoy tell by shape),
   reduced effects (fewer particles/ambient motion).
