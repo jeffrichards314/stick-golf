@@ -49,7 +49,8 @@
     }
     if (code === 'KeyM' && !e.repeat) { App.toggleMute(); return true; }
     if (G.UI.current) {
-      if ((code === 'Enter' || code === 'Space') && (G.UI.current === 'holeDone')) { App.nextHole(); return true; }
+      if ((code === 'Enter' || code === 'Space') && (G.UI.current === 'holeDone' || G.UI.current === 'mpHole')) { App.nextHole(); return true; }
+      if ((code === 'Enter' || code === 'Space') && G.UI.current === 'mpHandoff' && G.Multi) { G.Multi.go(); return true; }
       return false;
     }
     if (!App.session || App.waiting) return false;
@@ -70,13 +71,17 @@
       const rn = G.Progress.ROUND_NAMES[r.round] || '';
       sub = 'Hole ' + ((r.offset || 0) + r.idx + 1) + ' · ' + rn + ' ·';
       kicker = 'Hole ' + ((r.offset || 0) + r.idx + 1); mode = rn + ' · ' + (r.idx + 1) + '/' + r.n;
+    } else if (r.kind === 'multi') {
+      const rn = r.random ? 'Random' : (G.Progress.ROUND_NAMES[r.round] || '');
+      sub = 'Hole ' + ((r.offset || 0) + r.idx + 1) + ' ·';
+      kicker = 'Hole ' + ((r.offset || 0) + r.idx + 1); mode = 'Multiplayer · ' + rn + ' · ' + (r.idx + 1) + '/' + r.n;
     } else if (r.kind === 'practice') { kicker = 'Hole ' + ((r.offset || 0) + 1); mode = 'Practice' + (r.def && r.def.name ? ' · ' + r.def.name : ''); }
     else if (r.kind === 'tutorial') { kicker = 'Tutorial'; mode = 'Unlimited strokes · restart any time'; }
     else { sub = 'Hole ' + (r.idx + 1) + '/' + r.n + ' ·'; kicker = 'Hole ' + (r.idx + 1) + '/' + r.n; mode = 'Practice'; }
-    if (r.kind === 'course' && r.remix) mode = 'Remix · ' + mode;
+    if ((r.kind === 'course' || r.kind === 'multi') && r.remix) mode = 'Remix · ' + mode;
     if (!total && r.kind !== 'practice' && r.kind !== 'tutorial') { const t = rel(); if (t !== null) total = { label: 'Total', value: t }; }
     const s = App.session;
-    const timed = r.kind === 'course' || r.kind === 'daily' || r.kind === 'random' || r.kind === 'practice' || r.kind === 'tutorial';
+    const timed = r.kind === 'course' || r.kind === 'multi' || r.kind === 'daily' || r.kind === 'random' || r.kind === 'practice' || r.kind === 'tutorial';
     const roundT = (r.times || []).reduce((a, x) => a + (x || 0), 0) + (s && !r.scores[r.idx] ? s.clock : 0);
     return { sub, kicker, mode, total, allowRestart: r.kind === 'dev' || r.kind === 'practice' || r.kind === 'tutorial',
       clock: timed && s ? { hole: s.clock, round: r.n > 1 ? roundT : null } : null, showMe: (r.kind === 'practice' || r.kind === 'tutorial') && s && s.hasBotHint() };
@@ -105,9 +110,11 @@
     }
     return G.Modes.strokeLimit(run.diff, par);
   }
+  // the hole is ready: play it (multiplayer: hand the device to the next player first)
+  function startReady() { if (App.run.kind === 'multi') G.Multi.ready(App.run); else playCurrent(); }
   function waitHole() {
     const r = App.run;
-    if (r.ready(r.idx)) { playCurrent(); return; }
+    if (r.ready(r.idx)) { startReady(); return; }
     App.waiting = true;
     App.input.handler = proxy;
     G.UI.showHud(false);
@@ -118,8 +125,11 @@
     App.waiting = false;
     if (!hole) { G.UI.toast('Hole unavailable', 'warn'); App.quitToMenu(); return; }
     const theme = r.theme(i);
+    const mp = r.kind === 'multi' ? r.mp.players[r.mp.turn] : null;
+    const cos = Object.assign(G.Progress.equipped(), { holeNum: (r.offset || 0) + i + 1 });
+    if (mp) cos.ball = mp.ball;
     App.session = G.Play.create({
-      hole, theme, diff: r.diff, R: App.R, cam: App.cam, cosmetics: Object.assign(G.Progress.equipped(), { holeNum: (r.offset || 0) + i + 1 }),
+      hole, theme, diff: r.diff, R: App.R, cam: App.cam, cosmetics: cos,
       mulligans: r.mulligans, kind: r.kind, strokeLimit: strokeLimitFor(r, hole.par),
       onHoled, onFailed,
     });
@@ -127,6 +137,8 @@
     App.input.handler = proxy;
     G.UI.hide(); G.UI.showHud(true);
     if (App.lookToggle) App.toggleLook();
+    G.UI.setHudPlayer(mp ? { name: mp.name, ball: mp.ball, idx: r.mp.turn, count: r.mp.players.length } : null);
+    if (mp) G.UI.toast(mp.name + '\'s turn', 'info', 1300);
     App.state = 'play';
     try { if (G.Music) G.Music.setTheme(theme && typeof theme.index === 'number' ? theme.index : 0); } catch (e) { /* */ }
     // coach card (tutorial) / practice bar
@@ -139,23 +151,28 @@
   // "New gimmick" intro cards during the pre-shot pan + token hint
   function introduce(r, i, hole) {
     try {
+      const mpr = r.kind === 'multi';
+      if (mpr && r.mp.turn > 0) return; // pass-and-play: the cards show once per hole, for the first player
       const M = G.Manifest, info = (M && M.GIMMICK_INFO) || {};
       const types = [];
       (hole.gm || []).forEach((g) => { if (g && g.t && types.indexOf(g.t) < 0) types.push(g.t); });
       const show = [];
-      const cg = r.kind === 'course' && r.def && r.def.gimmick;
+      const cg = (r.kind === 'course' || mpr) && r.def && r.def.gimmick;
       if (i === 0 && cg) show.push(cg); // hole 1 of a course always introduces the course's gimmick
-      types.forEach((t) => { if (show.indexOf(t) < 0 && !G.Progress.gimmickSeen(t) && info[t]) show.push(t); });
+      // multiplayer never touches the lifetime "gimmicks met" record: it tracks what it already showed in the run itself
+      const seen = mpr ? (t) => G.Progress.gimmickSeen(t) || r.mp.seenG.has(t) : (t) => G.Progress.gimmickSeen(t);
+      types.forEach((t) => { if (show.indexOf(t) < 0 && !seen(t) && info[t]) show.push(t); });
       // the course's own gimmick first, at most 2 cards
       show.slice(0, 2).forEach((t, k) => setTimeout(() => {
         if (App.session && App.session.hole === hole) G.UI.introCard(t, info[t] || {});
       }, 350 + k * 2600));
-      G.Progress.markGimmicksSeen(types);
+      if (mpr) types.forEach((t) => r.mp.seenG.add(t)); else G.Progress.markGimmicksSeen(types);
       if (types.indexOf('tokens') >= 0) setTimeout(() => { if (App.session && App.session.hole === hole) G.UI.toast('★ Collect all stars to open the cup', 'info', 2600); }, show.length ? 600 + show.length * 2600 : 600);
     } catch (e) { console.warn('[intro]', e); }
   }
   function onHoled(res) {
     const r = App.run, i = r.idx;
+    if (r.kind === 'multi') { G.Multi.holed(res); return; }
     let newBest = false;
     const score = res.score !== undefined ? res.score : res.strokes;
     if (r.kind === 'practice' || r.kind === 'tutorial') {
@@ -184,6 +201,7 @@
   }
   function onFailed(res) {
     const r = App.run;
+    if (r.kind === 'multi') { G.Multi.failed(res, App.session); return; }
     if (r.kind === 'practice' || r.kind === 'tutorial') { // e.g. swamped by the flood: just start the hole again
       setTimeout(() => { if (App.session && App.run === r) { App.session.restart(); G.UI.toast('Try again!', 'info', 1200); } }, 300);
       return;
@@ -308,12 +326,10 @@
     if (!G.Generator || !G.Generator.mirrorHole) { G.UI.toast('Remix is not available yet', 'warn'); return; }
     startCourseRun(id, 0, round || 'all', true);
   };
-  function startCourseRun(id, holeIdx, round, remix) {
-    holeIdx = Math.max(0, holeIdx | 0);
-    const def = G.Progress.def(id);
-    G.UI.show('loading', { title: 'Loading course…', sub: def ? def.name : id });
+  // Loads a course and cuts out the round to play (optionally mirrored): cb(err, {holes, round, a, b, n}); err = {stage:'load'|'remix', err?}
+  function loadRound(id, holeIdx, round, remix, cb) {
     G.Progress.loadCourse(id, (holes, err) => {
-      if (!holes || !holes.length) { G.UI.toast('Could not load course (' + (err || '?') + ')', 'warn'); G.UI.show(def ? 'course' : 'courses', { id }); return; }
+      if (!holes || !holes.length) { cb({ stage: 'load', err }); return; }
       const n = holes.length; // tolerate stale 9-hole data
       if (round !== 'all' && round !== 'front' && round !== 'back') round = holeIdx >= 9 && n > 9 ? 'back' : 'front';
       if (n <= 9) round = 'front';
@@ -321,13 +337,23 @@
       let list = holes.slice(a, b);
       if (remix) {
         try { list = list.map((h) => { const m = G.Generator.mirrorHole(h); if (m && !/remix/i.test(m.name || '')) m.name = (h.name || 'Hole') + ' (Remix)'; return m; }); }
-        catch (e) { console.error('[remix]', e); G.UI.toast('Remix failed', 'warn'); G.UI.show('course', { id }); return; }
+        catch (e) { console.error('[remix]', e); cb({ stage: 'remix' }); return; }
       }
-      const r = G.Run.fromHoles('course', def, list, G.Modes.current());
-      r.round = round; r.offset = a; r.courseHoles = n; r.remix = !!remix; r.times = [];
-      const rel = Math.max(0, Math.min(b - a - 1, holeIdx - a));
+      cb(null, { holes: list, round, a, b, n });
+    });
+  }
+  function startCourseRun(id, holeIdx, round, remix) {
+    holeIdx = Math.max(0, holeIdx | 0);
+    const def = G.Progress.def(id);
+    G.UI.show('loading', { title: 'Loading course…', sub: def ? def.name : id });
+    loadRound(id, holeIdx, round, remix, (fail, L) => {
+      if (fail && fail.stage === 'load') { G.UI.toast('Could not load course (' + (fail.err || '?') + ')', 'warn'); G.UI.show(def ? 'course' : 'courses', { id }); return; }
+      if (fail) { G.UI.toast('Remix failed', 'warn'); G.UI.show('course', { id }); return; }
+      const r = G.Run.fromHoles('course', def, L.holes, G.Modes.current());
+      r.round = L.round; r.offset = L.a; r.courseHoles = L.n; r.remix = !!remix; r.times = [];
+      const rel = Math.max(0, Math.min(L.b - L.a - 1, holeIdx - L.a));
       // a round is played in order from its first hole; a hole index is only honoured for automation (?course=&hole=)
-      r.courseId = id; r.idx = !remix && App.allowHoleStart && holeIdx >= a && holeIdx < b ? rel : 0; r.startIdx = r.idx;
+      r.courseId = id; r.idx = !remix && App.allowHoleStart && holeIdx >= L.a && holeIdx < L.b ? rel : 0; r.startIdx = r.idx;
       r.bonusBefore = G.Progress.courseInfo(id).bonus;
       App.run = r; App.session = null;
       playCurrent();
@@ -359,6 +385,9 @@
     playCurrent();
     return true;
   };
+  // Local pass-and-play: App.startMultiplayer({players:[{name, ball}], courseId, round, remix, seed}) -> started?
+  // courseId => a baked course (round 'all'|'front'|'back', remix); no courseId => a Random course (seed number or code, default random).
+  App.startMultiplayer = function (o) { return G.Multi ? G.Multi.start(o) : false; };
   App.showMe = function (on) { const s = App.session; if (!s || !s.showMe) return false; const v = s.showMe(on); if (v) App.cam.skipIntro(); return v; };
   App.startDev = function () {
     const D = G.Dev;
@@ -395,6 +424,7 @@
   };
   App.nextHole = function () {
     const r = App.run; if (!r) return;
+    if (r.kind === 'multi') { G.Multi.nextHole(); return; }
     if (r.idx >= r.n - 1) { finishRun(); return; }
     r.idx++;
     waitHole();
@@ -426,6 +456,7 @@
     else if (r.kind === 'daily') App.startDaily();
     else if (r.kind === 'random') App.startRandom(r.seed);
     else if (r.kind === 'dev') App.startDev();
+    else if (r.kind === 'multi') G.Multi.start(r.mp.setup);
   };
   App.pause = function () {
     const s = App.session; if (!s || App.waiting) return;
@@ -445,7 +476,7 @@
   };
   App.quitToMenu = function (screen, sargs) {
     const r = App.run;
-    G.UI.clearIntro(); G.UI.setCoach(null);
+    G.UI.clearIntro(); G.UI.setCoach(null); G.UI.setHudPlayer(null);
     App.session = null; App.waiting = false; App.run = null;
     if (App.lookToggle) { App.lookToggle = false; App.input.lookToggle = false; }
     G.UI.showHud(false);
@@ -462,6 +493,7 @@
     const s = App.session, r = App.run;
     const o = { state: App.state, screen: G.UI.current || null, waiting: !!App.waiting };
     if (r) Object.assign(o, { kind: r.kind, courseId: r.courseId || null, round: r.round || null, offset: r.offset || 0, hole: r.idx, courseHole: (r.offset || 0) + r.idx, holes: r.n, total: r.totalStrokes(), scores: r.scores.slice() });
+    if (r && r.mp && G.Multi) o.multi = G.Multi.status(r);
     if (s) {
       Object.assign(o, {
         holeId: s.hole.id, par: s.hole.par, strokes: s.S.strokes, bonus: s.S.bonus || 0, score: s.score(),
@@ -473,6 +505,7 @@
     }
     return o;
   };
+  App._internal = { playCurrent, waitHole, loadRound };
   App.setSpin = function (v) { const s = App.session; if (!s) return false; s.setSpin(+v || 0); return s.spin; };
   App.currentPlay = function () { const s = App.session; return s ? { W: s.W, S: s.S, hole: s.hole, session: s, run: App.run } : null; };
   App.shoot = function (angle, power, spin) { const s = App.session; if (!s) return false; App.cam.skipIntro(); return s.shoot(angle, power, spin); };
@@ -554,7 +587,7 @@
       if (r && r.kind !== 'course' && r.kind !== 'dev') {
         r.pump(App.waiting ? 14 : 3);
         if (App.waiting) {
-          if (r.ready(r.idx)) playCurrent();
+          if (r.ready(r.idx)) startReady();
           else G.UI.loaderUpdate(r.jobStatus(r.idx), 'hole ' + (r.idx + 1));
         }
       }

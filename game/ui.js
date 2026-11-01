@@ -60,6 +60,7 @@
     phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2M2.5 9v6M21.5 9v6"/>',
     access: '<circle cx="12" cy="4.5" r="2"' + F + '/><path d="M4.5 8.5 12 10l7.5-1.5M12 10v5l-3 6M12 15l3 6"/>',
     bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    users: '<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20.5v-1.2A5.3 5.3 0 0 1 7.8 14h2.4a5.3 5.3 0 0 1 5.3 5.3v1.2"/><path d="M16 4.8a3.4 3.4 0 0 1 0 6.4M18.3 14.3a5.3 5.3 0 0 1 3.2 5v1.2"/>',
     fire: '<path d="M12 21c-4 0-6.5-2.6-6.5-6.2 0-3.7 3-5.6 4-9.3 2.1 1.4 3 3.3 3 5.1 1-.6 1.6-1.6 1.8-3 2 1.7 4.2 4.2 4.2 7.2 0 3.6-2.5 6.2-6.5 6.2z"/>',
   };
   const ic = (n, cls) => '<svg class="ico ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
@@ -427,7 +428,10 @@
   function buildHud() {
     hud.innerHTML =
       '<div class="hud-top">' +
-        '<div class="hcard hud-hole"><div class="h-kick"><span class="h-kicker"></span><span class="h-par"></span></div><div class="h-name"></div><div class="h-mode"></div></div>' +
+        '<div class="hud-left">' +
+          '<div class="hcard h-player hidden" aria-live="polite"><canvas class="hp-cv"></canvas><span class="hp-t"><b class="hp-name"></b><small class="hp-sub"></small></span></div>' +
+          '<div class="hcard hud-hole"><div class="h-kick"><span class="h-kicker"></span><span class="h-par"></span></div><div class="h-name"></div><div class="h-mode"></div></div>' +
+        '</div>' +
         '<div class="hud-mid">' +
           '<div class="hcard h-strokes"><small>Strokes</small><div class="hs-v"><b></b><span class="hs-lim"></span></div></div>' +
           '<div class="hud-chips"><span class="hchip h-total hidden"></span><span class="hchip h-bonus hidden"></span><span class="hchip h-tokens hidden"></span>' +
@@ -456,7 +460,7 @@
       '<div class="hud-coach hidden"></div>' +
       '<div class="hud-hint hidden">' + ic('target') + 'Drag back anywhere to aim · release to shoot</div>' +
       '<div class="hud-skip hidden">Tap to skip</div>';
-    ['h-kicker', 'h-par', 'h-name', 'h-mode', 'h-strokes', 'h-total', 'h-bonus', 'h-tokens', 'spinsel', 'sp-lbl', 'h-wind', 'warrow', 'wtxt', 'hud-power', 'pw-fill', 'pw-txt', 'pw-pct', 'mtxt', 'mcount', 'hud-hint', 'hud-skip', 'i-mute', 'h-clock', 'ck-h', 'ck-r', 'pw-last', 'pw-prev', 'pw-scale', 'hud-coach', 'sm-t'].forEach((c) => { hudEls[c] = hud.querySelector('.' + c); });
+    ['h-kicker', 'h-par', 'h-name', 'h-mode', 'h-strokes', 'h-total', 'h-bonus', 'h-tokens', 'spinsel', 'sp-lbl', 'h-wind', 'warrow', 'wtxt', 'hud-power', 'pw-fill', 'pw-txt', 'pw-pct', 'mtxt', 'mcount', 'hud-hint', 'hud-skip', 'i-mute', 'h-clock', 'ck-h', 'ck-r', 'pw-last', 'pw-prev', 'pw-scale', 'hud-coach', 'sm-t', 'h-player', 'hp-name', 'hp-sub', 'hp-cv'].forEach((c) => { hudEls[c] = hud.querySelector('.' + c); });
     hudEls.sv = hud.querySelector('.hs-v b'); hudEls.slim = hud.querySelector('.hs-lim');
     hudEls.spinBtns = hud.querySelectorAll('[data-act="hud-spin"]');
     hudEls.spinDots = hud.querySelectorAll('.sp-dots i');
@@ -486,6 +490,20 @@
     if (fn) { e.preventDefault(); e.stopPropagation(); click(); fn(el.dataset, el); el.blur(); }
   }
   function showHud(v) { hud.classList.toggle('hidden', !v); hudKey = ''; }
+  // Multiplayer: whose turn it is (name + ball) in the top-left of the HUD; null hides it.
+  // The ball preview is a "toast"-type anim so it survives screen changes (stopAnims keeps those).
+  function setHudPlayer(p) {
+    const el = hudEls['h-player']; if (!el) return;
+    anims = anims.filter((a) => !a.hudp);
+    el.classList.toggle('hidden', !p);
+    hud.classList.toggle('mp', !!p);
+    if (!p) return;
+    hudEls['hp-name'].textContent = p.name;
+    hudEls['hp-sub'].innerHTML = 'Player ' + (p.idx + 1) + '/' + p.count + '<span class="hp-yt"> · your turn</span>';
+    el.setAttribute('aria-label', p.name + ', player ' + (p.idx + 1) + ' of ' + p.count + ', your turn');
+    anims.push({ cv: hudEls['hp-cv'], cat: 'balls', item: findItem('balls', p.ball), fps: 12, last: -1, toast: true, hudp: true });
+    if (!animRaf) animRaf = requestAnimationFrame(animTick);
+  }
   // ---- coach card (tutorial) ----
   let coach = null, coachMin = false;
   function setCoach(o) { coach = o; coachMin = false; if (o) { o.step = 0; o.seen = 0; } renderCoach(); }
@@ -811,6 +829,7 @@
           '<button class="tile hero" style="--d:.1s" data-act="go" data-to="courses"><span class="tile-ic">' + ic('play') + '</span><span class="hero-b"><span class="tile-l">Play courses</span>' +
             '<span class="tile-s">' + (nc ? 'Up next: #' + Pg.courseNumber(nc) + ' ' + esc(nc.name) : cleared + ' courses cleared') + '</span></span><span class="hero-go">' + ic('next') + '</span></button>' +
           '<div class="tgrid">' +
+            '<button class="tile mp-tile" style="--d:.14s" data-act="go" data-to="mpSetup"><span class="tile-ic">' + ic('users') + '</span><span class="mp-tile-b"><span class="tile-l">Multiplayer</span><span class="tile-s">Pass &amp; play · 2–4 players, one device</span></span></button>' +
             tile('endless', 'infinity', 'Endless', 'Survival run', 0) + tile('daily', 'calendar', 'Daily', streakTxt(), 1) +
             tile('random', 'dice', 'Random', 'Shareable seeds', 2) + tile('practice', 'target', 'Practice', 'Any hole, any time', 3) +
             tile('tutorials', 'grad', 'Tutorials', tutTxt(), 4) + tile('achievements', 'medal', 'Achievements', achTxt(), 5) +
@@ -1028,17 +1047,18 @@
   SCREENS.pause = function () {
     const s = App().session, run = App().run;
     const m = s ? s.mull.left : 0;
-    const ex = run ? (run.kind === 'course' ? (G.Progress.ROUND_NAMES[run.round] || '') : run.kind === 'endless' ? 'Endless' : cap(run.kind)) : '';
-    render('<div class="center-col"><div class="card pop pause-card"><div class="card-k">' + ic('pause') + 'Paused</div>' +
+    const mp = !!(run && run.kind === 'multi' && run.mp);
+    const ex = run ? (run.kind === 'course' ? (G.Progress.ROUND_NAMES[run.round] || '') : run.kind === 'endless' ? 'Endless' : mp ? 'Multiplayer' : cap(run.kind)) : '';
+    render('<div class="center-col"><div class="card pop pause-card"><div class="card-k">' + ic('pause') + 'Paused' + (mp ? ' · ' + esc(run.mp.players[run.mp.turn].name) + '\'s turn' : '') + '</div>' +
       (s ? '<h2 class="ttl">' + esc(s.hole.name) + '</h2><div class="kv-row"><span><small>Par</small><b>' + s.hole.par + '</b></span><span><small>Strokes</small><b>' + s.S.strokes + '</b></span>' + (ex ? '<span><small>Mode</small><b>' + esc(ex) + '</b></span>' : '') + '</div>' : '<h2 class="ttl">Paused</h2>') +
       '<div class="menu">' +
       '<button class="btn big primary" data-act="resume">' + ic('play') + 'Resume</button>' +
       (run && (run.kind === 'dev' || run.kind === 'practice' || run.kind === 'tutorial') ? '<button class="btn big" data-act="restart">' + ic('replay') + 'Restart hole</button>' : '') +
       (s && (run.kind === 'practice' || run.kind === 'tutorial') && s.hasBotHint() ? '<button class="btn big" data-act="showme">' + ic('bulb') + (s.botGhost ? 'Hide hint' : 'Show me') + '</button>' : '') +
       (m !== 0 ? '<button class="btn big ' + (s && s.canMulligan() ? '' : 'disabled') + '" data-act="mull">' + ic('undo') + 'Mulligan <small>' + (m === Infinity ? 'unlimited' : m + ' left') + '</small></button>' : '') +
-      (run && run.kind !== 'endless' && run.scores.length ? '<button class="btn big" data-act="card">' + ic('card') + 'Scorecard</button>' : '') +
+      (run && (mp || (run.kind !== 'endless' && run.scores.length)) ? '<button class="btn big" data-act="card">' + ic('card') + 'Scorecard</button>' : '') +
       '<div class="menu-2"><button class="btn" data-act="settings">' + ic('settings') + 'Settings</button>' +
-      '<button class="btn danger" data-act="quit">' + ic('home') + (run && (run.kind === 'practice' || run.kind === 'tutorial') ? 'Quit' : 'Quit round') + '</button></div></div>' +
+      '<button class="btn danger" data-act="quit">' + ic('home') + (run && (run.kind === 'practice' || run.kind === 'tutorial') ? 'Quit' : mp ? 'Quit game' : 'Quit round') + '</button></div></div>' +
       '<div class="keys"><span><kbd>Drag</kbd> aim</span><span><kbd>←→↑↓</kbd><kbd>Space</kbd> shoot</span><span><kbd>B</kbd><kbd>T</kbd> spin</span><span><kbd>L</kbd> look</span><span><kbd>M</kbd> mute</span></div></div></div>', 'pause dim');
     on({
       resume: () => { click(); App().resume(); }, back: () => App().resume(),
@@ -1046,7 +1066,7 @@
       showme: () => { click(); App().resume(); App().showMe(); },
       mull: () => { click(); App().resume(); if (s && s.mulligan()) toast('Mulligan!', 'info'); },
       settings: () => { click(); show('settings', { ret: 'pause' }); },
-      card: () => { click(); show('scorecard', { ret: 'pause' }); },
+      card: () => { click(); show(mp ? 'mpScorecard' : 'scorecard', { ret: 'pause' }); },
       quit: (d, el) => {
         if (!el.classList.contains('armed')) { el.classList.add('armed'); el.innerHTML = ic('home') + 'Tap again to quit'; A().sfx('uiback'); return; }
         click(); App().quitToMenu();
@@ -1593,7 +1613,12 @@
   function back() { const fn = acts.back; if (fn) { A() && A().sfx('uiback'); fn({}); return true; } return false; }
 
   G.UI = {
-    init, show, hide, toast, bigLabel, introCard, clearIntro, swishBanner, gimIcon, showHud, updateHud, loaderUpdate, back, unlockToasts, achToasts, setCoach, icon: ic, drawCosmetic: drawCos, fmtTime,
+    init, show, hide, toast, bigLabel, setHudPlayer, introCard, clearIntro, swishBanner, gimIcon, showHud, updateHud, loaderUpdate, back, unlockToasts, achToasts, setCoach, icon: ic, drawCosmetic: drawCos, fmtTime,
     get current() { return current; }, get args() { return curArgs; }, hudClick,
+    // building blocks for screens that live in other files (game/multi.js)
+    kit: {
+      SCREENS, render, on, show, click, scr, keepScroll, esc, cap, ic, iconBtn, topbar, section, diffChip, swatch, gimBadge, courseGim, scv, relPar, relCls, relTag,
+      scoreTiles, fmtTime, fmtTimeS, cosCanvas, bindPreviews, toast, copyText, A,
+    },
   };
 })();

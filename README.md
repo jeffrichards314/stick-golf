@@ -6,7 +6,7 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
 * **The 60 courses come one after another, each its own concept.** Course 1 is plain golf. Every course after it introduces **one new gimmick**, for **59 gimmicks** in all. Its holes are built around that gimmick, which is usually the only way to the cup: walls no swing can clear, chasms wider than a full-power shot, sealed vaults, tunnels through mountains. Later holes in each course mix in gimmicks from earlier courses.
 * **Spin on full shots, never on putts.** Backspin lifts the ball and makes it bite; topspin dives and runs on.
 * **Swish bonus.** Drop the ball straight into the cup without touching the green first and you get −1 stroke.
-* **Modes:** Endless (fully customisable), Daily Challenge and Random Course, with shareable seed codes.
+* **Modes:** Endless (fully customisable), Daily Challenge and Random Course, with shareable seed codes, plus local pass-and-play **Multiplayer** for 2–4 players.
 * **Bot-verified.** A headless bot running the *same* physics module finishes every baked hole in at most par+2 strokes. Its solution must actually use the course's gimmick.
 
 ## Play online
@@ -19,6 +19,13 @@ A 2D side-view physics golf game in the spirit of Super Stickman Golf. It is van
 * **Remix:** once you've cleared a course under par, you can play it mirrored (tee on the right). Remixes keep their own personal bests.
 * **Tutorials:** "The Basics" walks through the controls and sits next to course 1. There is also one teaching hole for each of the 59 gimmicks. Completing a gimmick's tutorial makes it available in **Endless**. Tutorials have a "Show me" button that replays the bot's solution as a ghost ball.
 * **Practice:** play any single hole of any unlocked course, with unlimited restarts and "Show me".
+* **Multiplayer (pass and play):** 2–4 players share one device (phone or desktop) and take turns on every hole.
+  * **Setup:** from the title menu, add or remove players, name them, and give each a ball from the Locker balls they have unlocked (defaults are distinct). Then choose what to play: any unlocked course as All 18, Front 9 or Back 9 (Normal, or Remix once cleared), or a Random course by seed code. The setup is remembered.
+  * **Turns:** player 1 plays the whole hole, a "Pass to <name>" screen hides the course while the device changes hands, then player 2 plays it, and so on. The HUD shows whose turn it is (name and ball).
+  * **Rules** are the same as a single-player round: the difficulty's stroke limit picks the hole up and scores it (limit + 1), there are no hole restarts, the swish −1 bonus and spin rules apply, and each hole is timed per player. Mulligans follow the difficulty but are counted per player.
+  * **Scorecard:** one shared card with a row per player (hole scores, Out / In / Tot and vs par). It appears after every hole, from the pause menu and from the hand-off screen. The pause menu offers resume, scorecard, mulligan, settings and quit (with a confirm).
+  * **Results:** standings with rank ties, a winner celebration, each player's swishes, aces, picked-up holes, mulligans and time, then Play again, New setup or Menu.
+  * **Not recorded:** multiplayer games never unlock courses, set personal bests or daily results, or count toward lifetime stats and achievements. They also don't mark gimmicks as met.
 * **Daily Challenge:** a seeded 9-hole course each day. Results go on a local leaderboard with streaks, and an emoji share card can be copied or shared.
 * **Endless:** fully customisable. Gimmicks unlock as you complete their tutorials.
 * **Previous shot:** while you aim, a ghost ball replays your last shot, and the last aim and power are marked.
@@ -121,7 +128,7 @@ src/designs/*.js    per-gimmick set-pieces (registry.js, core.js, a.js, b.js, c.
 src/generator.js    hole composition, course plans, validation, Endless/Daily/Random, presets
 src/bot.js          shot-search bot (beam search + geodesic field with teleport/pipe/cannon shortcuts, switch & token goals)
 data/               baked holes (one JS file per course) + index
-game/               renderer, UI, input, camera, audio, storage, progression, modes
+game/               renderer, UI, input, camera, audio, storage, progression, modes, multiplayer (multi.js)
 tools/ test/        build, verify, try, worker pool
 docs/CONTRACT.md    hole JSON format, gimmick field reference, module APIs
 ```

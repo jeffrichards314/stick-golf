@@ -199,3 +199,25 @@ faster than 20 s × round par) · `{type:'tutorials', n}` (tutorial holes comple
 * `frame.prevAim = { angle, power }` — draw a faint marker of the previous shot's aim/power on the aim UI.
 * `frame.a11y = { colorblind:bool, reducedFx:bool }` — color-blind-safe hazards (patterns/shapes, not just color; decoy tell by shape),
   reduced effects (fewer particles/ambient motion).
+
+## v4: local multiplayer (pass and play)
+
+`game/multi.js` → `GOLF.Multi`; a game is a normal Run with `kind: 'multi'` and a `run.mp` state object. It records nothing
+single-player (no course progress, bests, daily results, lifetime stats, achievements or "gimmicks met").
+
+```js
+GOLF.App.startMultiplayer({
+  players: [{ name, ball }, ...],   // 2-4; ball = an unlocked GOLF.Render.COSMETICS.balls id (locked/unknown -> a default)
+  courseId, round, remix,           // a baked, unlocked course; round 'all'|'front'|'back'; remix needs the course cleared
+  seed,                             // no courseId -> a Random course (number or code); omitted -> random seed
+}) // -> true if it started (false + a toast otherwise)
+```
+
+* `run.scores / run.times / run.mulligans` always point at the player whose turn it is, so the single-player HUD, stroke limit and
+  mulligans work unchanged. Mulligans are per player.
+* `run.mp = { players:[{name, ball, scores[], times[], mull:{left,used}, swishes, aces, pickups}], turn, phase, setup, seenG }`;
+  `phase` is `'loading' | 'handoff' | 'play' | 'hole' | 'results'`. `setup` is what `startMultiplayer` needs to replay the game.
+* Screens: `mpSetup`, `mpHandoff` (opaque; the player taps "ready" → `GOLF.Multi.go()`), `mpHole` (shared scorecard after the
+  last player), `mpScorecard`, `mpResults`.
+* `GOLF.App.status().multi = { phase, turn, turnName, turnBall, count, setup, players:[{name, ball, scores, failed, total, vsPar, mulligans, swishes, aces, pickups, time}] }`.
+* `GOLF.Multi.standings(run)` ranks players by score vs par (equal scores share a rank).
