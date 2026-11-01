@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fb8f0"/>
+      <stop offset="0.62" stop-color="#9fd8f7"/>
+      <stop offset="0.62" stop-color="#4caf50"/>
+      <stop offset="1" stop-color="#2e7d32"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="0.38" cy="0.34" r="0.72">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.62" stop-color="#f1f4f7"/>
+      <stop offset="1" stop-color="#b9c3cc"/>
+    </radialGradient>
+    <radialGradient id="dimple" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#c9d2da"/>
+      <stop offset="1" stop-color="#e9eef2"/>
+    </radialGradient>
+    <clipPath id="ballclip"><circle cx="256" cy="236" r="150"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <ellipse cx="262" cy="402" rx="128" ry="20" fill="#1b5e20" opacity="0.45"/>
+  <circle cx="256" cy="236" r="150" fill="url(#ball)"/>
+  <g clip-path="url(#ballclip)" fill="url(#dimple)">
+    <circle cx="186" cy="150" r="17"/><circle cx="236" cy="134" r="17"/><circle cx="288" cy="138" r="17"/><circle cx="336" cy="158" r="16"/>
+    <circle cx="160" cy="196" r="17"/><circle cx="210" cy="186" r="18"/><circle cx="262" cy="182" r="18"/><circle cx="314" cy="190" r="18"/><circle cx="362" cy="208" r="16"/>
+    <circle cx="150" cy="248" r="17"/><circle cx="200" cy="238" r="18"/><circle cx="254" cy="234" r="18"/><circle cx="306" cy="240" r="18"/><circle cx="356" cy="256" r="17"/>
+    <circle cx="166" cy="298" r="16"/><circle cx="214" cy="290" r="18"/><circle cx="266" cy="288" r="18"/><circle cx="318" cy="292" r="17"/><circle cx="360" cy="306" r="15"/>
+    <circle cx="200" cy="338" r="15"/><circle cx="250" cy="340" r="16"/><circle cx="300" cy="338" r="15"/>
+  </g>
+  <ellipse cx="206" cy="168" rx="46" ry="30" fill="#ffffff" opacity="0.55" transform="rotate(-28 206 168)"/>
+  <circle cx="256" cy="236" r="150" fill="none" stroke="#8a97a3" stroke-width="5"/>
+</svg>
